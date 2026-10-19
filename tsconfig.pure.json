@@ -1,0 +1,11 @@
+{
+  // The core must not touch the browser: without DOM in `lib`, a stray `window` or
+  // `document` fails the typecheck.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.pure.tsbuildinfo",
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src/core"]
+}
