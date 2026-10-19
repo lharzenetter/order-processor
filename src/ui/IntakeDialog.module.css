@@ -1,0 +1,118 @@
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.products {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.product {
+  position: relative;
+}
+
+.productButton {
+  width: 100%;
+  min-height: 64px;
+  padding-right: 80px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.sold .productButton {
+  border-color: var(--sold);
+  background: var(--sold-bg);
+  color: var(--sold);
+}
+
+.tag {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.count,
+.minus {
+  position: absolute;
+  top: 8px;
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.count {
+  right: 8px;
+  min-width: 36px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.minus {
+  right: 50px;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: var(--chip);
+  font-weight: 800;
+}
+
+.pagerColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subheading {
+  margin: 6px 0;
+}
+
+.hint {
+  min-height: 20px;
+  font-size: 14px;
+}
+
+.bad {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick button {
+  min-width: 48px;
+  padding: 6px;
+  font-weight: 700;
+}
+
+.quick .selected {
+  background: var(--ink);
+  color: #fff;
+}
+
+.missingMode button {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.footer {
+  margin-top: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}

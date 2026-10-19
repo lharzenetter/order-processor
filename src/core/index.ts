@@ -6,6 +6,7 @@ export type { Product } from "./menu";
 export { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
 export { fold, reduce } from "./reduce";
 export {
+  acceptsIntake,
   boardRows,
   buzzedLines,
   evaluationRows,
@@ -16,6 +17,7 @@ export {
   openOrderByPager,
   openOrdersList,
   orderView,
+  pagerCheck,
   pagerOverview,
   soldOutWaiting,
 } from "./selectors";
@@ -26,6 +28,7 @@ export type {
   OpenOrdersListEntry,
   OrderView,
   OrderViewLine,
+  PagerCheck,
   PagerOverview,
   QueuedOrder,
   SoldOutWaiting,

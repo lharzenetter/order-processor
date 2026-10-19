@@ -1,0 +1,69 @@
+/* Colours from the Window screen prototype, variant A. */
+:root {
+  --bg: #f3f0e8;
+  --panel: #fff;
+  --ink: #1d1d1b;
+  --muted: #6b6b66;
+  --line: #d9d5ca;
+  --accent: #b3261e;
+  --go: #1f7a3a;
+  --go-bg: #dff3e4;
+  --warn: #c25e00;
+  --warn-bg: #ffe6cc;
+  --sold: #b3261e;
+  --sold-bg: #fde3e1;
+  --chip: #ebe7dc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    16px/1.3 system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  /* Taps must never select text or zoom on the window iPad. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 4px var(--warn);
+  }
+}

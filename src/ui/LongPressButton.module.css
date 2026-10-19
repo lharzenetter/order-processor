@@ -1,0 +1,23 @@
+.button {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--accent);
+  color: var(--accent);
+  -webkit-touch-callout: none;
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--sold-bg);
+}
+
+.holding .fill {
+  width: 100%;
+  transition: width 1.5s linear;
+}
+
+.label {
+  position: relative;
+}

@@ -1,0 +1,54 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 180px;
+  padding: 10px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.rail button {
+  min-height: 140px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.rail small {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.main {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+}
+
+.message {
+  padding: 24px;
+  font-size: 20px;
+}

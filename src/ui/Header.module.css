@@ -1,0 +1,42 @@
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--ink);
+  color: #fff;
+}
+
+.header button {
+  border-color: #555;
+  background: #333;
+  color: #fff;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.counts {
+  color: #aaa;
+}
+
+.grow {
+  flex: 1;
+}
+
+.undo small {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  font-size: 11px;
+  opacity: 0.7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verwaltung {
+  font-weight: 700;
+}

@@ -1,0 +1,63 @@
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.board {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.board td,
+.board th {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.label {
+  width: 150px;
+  font-weight: 700;
+}
+
+.sold .label {
+  color: var(--sold);
+}
+
+.nextChip {
+  min-width: 64px;
+  font-size: 22px;
+}
+
+.progress {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.actions {
+  white-space: nowrap;
+}
+
+.actions button + button {
+  margin-left: 4px;
+}
+
+.queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.queueChip {
+  min-height: 28px;
+  font-size: 14px;
+}

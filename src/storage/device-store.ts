@@ -19,6 +19,7 @@ export interface EventLog {
 export const FORMAT_VERSION = 1;
 
 export const DATABASE_NAME = "kirbe-pager";
+const DATABASE_VERSION = 1;
 
 export interface Meta {
   /** The format version of the stored log, which may be one this build can't read. */
@@ -77,28 +78,57 @@ const STRICT = { durability: "strict" } as const;
 export async function openDeviceStore(
   name: string = DATABASE_NAME,
 ): Promise<OpenedStore> {
-  const db = await openDB<Schema>(name, 1, {
-    upgrade(database) {
-      database.createObjectStore("events", { keyPath: "seq" });
-      database.createObjectStore("meta");
-    },
-  });
+  let db: Database;
+  try {
+    db = await openDB<Schema>(name, DATABASE_VERSION, {
+      upgrade(database) {
+        database.createObjectStore("events", { keyPath: "seq" });
+        database.createObjectStore("meta");
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "VersionError") {
+      throw error;
+    }
+    // A newer build upgraded the database: open it as it is, for export only.
+    return {
+      status: "unreadable",
+      store: deviceStore(await openDB<Schema>(name)),
+    };
+  }
   let formatVersion = await db.get("meta", "formatVersion");
   if (formatVersion === undefined) {
     await db.put("meta", FORMAT_VERSION, "formatVersion");
     formatVersion = FORMAT_VERSION;
   }
   const store = deviceStore(db);
-  return formatVersion === FORMAT_VERSION
+  return formatVersion === FORMAT_VERSION && (await isReadableLog(db))
     ? { status: "ready", store }
     : { status: "unreadable", store };
+}
+
+async function isReadableLog(db: Database): Promise<boolean> {
+  const events = await db.getAll("events");
+  if (!events.every(isEvent)) {
+    return false;
+  }
+  try {
+    fold(events);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function deviceStore(db: Database): DeviceStore {
   return {
     async load() {
       const events = await db.getAll("events");
-      return events.filter(isEvent);
+      // Checked at open; a record that is not an event here is a bug, never dropped silently.
+      if (!events.every(isEvent)) {
+        throw new Error("Das Protokoll enthält unbekannte Einträge");
+      }
+      return events;
     },
     async append(event) {
       const tx = db.transaction("events", "readwrite", STRICT);

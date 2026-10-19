@@ -329,3 +329,28 @@ export function openOrdersList(state: State): readonly OpenOrdersListEntry[] {
 function sum(values: readonly number[]): number {
   return values.reduce((a, b) => a + b, 0);
 }
+
+/**
+ * What intake does with a typed pager: `attached` is rejected, `missing` warns and restores the
+ * pager when the order is still started (05-exceptions).
+ */
+export type PagerCheck =
+  "empty" | "outOfRange" | "attached" | "missing" | "free";
+
+export function pagerCheck(state: State, pager: number | null): PagerCheck {
+  if (pager === null) {
+    return "empty";
+  }
+  if (!Number.isInteger(pager) || pager < 1 || pager > PAGER_COUNT) {
+    return "outOfRange";
+  }
+  if (openOrderByPager(state, pager) !== null) {
+    return "attached";
+  }
+  return state.missingPagers.includes(pager) ? "missing" : "free";
+}
+
+/** Whether intake may start an order on a pager with this check. */
+export function acceptsIntake(check: PagerCheck): boolean {
+  return check === "free" || check === "missing";
+}

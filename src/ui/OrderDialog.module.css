@@ -1,0 +1,53 @@
+.note {
+  display: block;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 22px;
+}
+
+.line {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.rebuzz {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 2px var(--warn) inset;
+}
+
+.lineTitle {
+  font-size: 19px;
+}
+
+.lineInfo {
+  margin-top: 4px;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepper b {
+  min-width: 28px;
+  font-size: 22px;
+  text-align: center;
+}
+
+.footer {
+  margin-top: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { fold, headerCounts, PAGER_COUNT, pagerOverview } from "./index";
+import {
+  acceptsIntake,
+  fold,
+  headerCounts,
+  PAGER_COUNT,
+  pagerCheck,
+  pagerOverview,
+} from "./index";
 import type { EventBody } from "./index";
 import { testLog } from "./test-log";
 
@@ -116,5 +123,30 @@ describe("pagers", () => {
     ],
   ])("refuse %s", (_, bodies) => {
     expect(() => foldBodies(...bodies)).toThrow();
+  });
+});
+
+// 05-exceptions: an attached pager is rejected, a missing one warns and is restored
+describe("checking the pager typed at intake", () => {
+  const state = foldBodies(
+    { type: "orderTaken", pager: 4, plates: POMMES },
+    { type: "pagerMarkedMissing", pager: 23 },
+  );
+
+  it.each<[number | null, string]>([
+    [null, "empty"],
+    [0, "outOfRange"],
+    [31, "outOfRange"],
+    [4, "attached"],
+    [23, "missing"],
+    [5, "free"],
+  ])("classifies pager %s as %s", (pager, verdict) => {
+    expect(pagerCheck(state, pager)).toBe(verdict);
+  });
+
+  it("lets intake start an order only on a free or a missing pager", () => {
+    expect(
+      [5, 23, 4, 0, null].map((p) => acceptsIntake(pagerCheck(state, p))),
+    ).toEqual([true, true, false, false, false]);
   });
 });

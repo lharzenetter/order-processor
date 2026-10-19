@@ -1,0 +1,52 @@
+.dialog {
+  width: min(720px, 94vw);
+  max-height: 90vh;
+  max-height: 90dvh;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 30%);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.wide {
+  width: min(1100px, 96vw);
+}
+
+.big {
+  width: min(560px, 92vw);
+  background: var(--panel);
+  text-align: center;
+}
+
+.inner {
+  padding: 16px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 24px;
+}
+
+.big .title {
+  font-size: 44px;
+}
+
+.close {
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+}

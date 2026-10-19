@@ -1,0 +1,28 @@
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.keypad button {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.display {
+  display: block;
+  min-height: 52px;
+  padding: 4px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 34px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.bad {
+  border-color: var(--accent);
+  color: var(--accent);
+}

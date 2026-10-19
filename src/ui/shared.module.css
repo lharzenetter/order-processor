@@ -1,0 +1,90 @@
+.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+}
+
+.go {
+  border-color: var(--go);
+  background: var(--go);
+  color: #fff;
+  font-weight: 600;
+}
+
+.warn {
+  border-color: var(--warn);
+  background: var(--warn);
+  color: #fff;
+  font-weight: 600;
+}
+
+.danger {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ghost {
+  background: transparent;
+}
+
+.small {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.grow {
+  flex: 1;
+}
+
+.heading {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--chip);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chipBuzzed {
+  background: var(--go-bg);
+  color: var(--go);
+}
+
+.chipRebuzz {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.pulse {
+  animation: pulse 1.2s infinite;
+}

@@ -106,6 +106,55 @@ describe("the event log on the device", () => {
   });
 });
 
+describe("a log this build can't read", () => {
+  // spec, "Storage": never wipe the log
+  it("refuses to start on a stored record that is not an event, and keeps it", async () => {
+    const name = freshName();
+    const store = await readyStore(name);
+    await store.append(event(1));
+    store.close();
+    const request = indexedDB.open(name);
+    await new Promise<void>((resolve) => {
+      request.onsuccess = () => {
+        const tx = request.result.transaction("events", "readwrite");
+        tx.objectStore("events").put({ seq: 2, garbage: true });
+        tx.oncomplete = () => {
+          request.result.close();
+          resolve();
+        };
+      };
+    });
+    const opened = await openDeviceStore(name);
+    expect(opened.status).toBe("unreadable");
+    expect((await opened.store.exportFile(1)).events).toHaveLength(2);
+  });
+
+  it("refuses to start on a stored log whose events don't fold", async () => {
+    const name = freshName();
+    const store = await readyStore(name);
+    await store.append(event(1, { type: "pagerRestored" }));
+    store.close();
+    expect((await openDeviceStore(name)).status).toBe("unreadable");
+  });
+
+  it("opens a database a newer build upgraded, for export only", async () => {
+    const name = freshName();
+    const store = await readyStore(name);
+    await store.append(event(1));
+    store.close();
+    const request = indexedDB.open(name, 5);
+    await new Promise<void>((resolve) => {
+      request.onsuccess = () => {
+        request.result.close();
+        resolve();
+      };
+    });
+    const opened = await openDeviceStore(name);
+    expect(opened.status).toBe("unreadable");
+    expect((await opened.store.exportFile(1)).events).toHaveLength(1);
+  });
+});
+
 describe("export and import", () => {
   it("reproduces the log in another store", async () => {
     const source = await readyStore();

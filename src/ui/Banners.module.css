@@ -1,0 +1,20 @@
+.soldOut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--sold-bg);
+  color: var(--sold);
+  font-weight: 600;
+}
+
+.standalone {
+  flex: none;
+  padding: 10px 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}

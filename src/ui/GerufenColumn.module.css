@@ -1,0 +1,40 @@
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.line {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.rebuzz {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.pager {
+  font-size: 20px;
+}
+
+.handOver {
+  width: 100%;
+  min-height: 60px;
+  font-size: 19px;
+}
