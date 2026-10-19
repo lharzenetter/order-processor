@@ -1,0 +1,107 @@
+import { describe, expect, it } from "vitest";
+import { boardRows, fold, nextOrderFor } from "./index";
+import { testLog } from "./test-log";
+
+function rowFor(state: ReturnType<typeof fold>, productId: string) {
+  const row = boardRows(state).find((r) => r.productId === productId);
+  if (row === undefined) {
+    throw new Error(`no row for ${productId}`);
+  }
+  return row;
+}
+
+describe("the board (Übersicht)", () => {
+  it("lists one row per product in display order", () => {
+    const state = fold([]);
+    expect(boardRows(state).map((r) => r.label)).toEqual([
+      "Flammkuchen",
+      "Flammkuchen Veggie",
+      "Pfannkuchen",
+      "Pommes",
+      "Braten",
+      "Schäufele",
+      "Schlachtplatte",
+      "Maultaschen",
+      "Schupfnudeln",
+      "Fleischkäs",
+    ]);
+    expect(rowFor(state, "braten").next).toBeNull();
+  });
+
+  // 04-allocation-and-handover-rules: FIFO per product
+  it("shows the oldest open order still waiting for each product as next", () => {
+    const log = testLog();
+    log.add({
+      type: "orderTaken",
+      pager: 12,
+      plates: [{ productId: "braten", count: 2 }],
+    });
+    log.add({
+      type: "orderTaken",
+      pager: 5,
+      plates: [
+        { productId: "pommes", count: 1 },
+        { productId: "braten", count: 1 },
+      ],
+    });
+    const state = fold(log.events);
+
+    expect(rowFor(state, "braten").next).toMatchObject({
+      pager: 12,
+      calledCount: 0,
+      plateCount: 2,
+      waiting: 2,
+    });
+    expect(rowFor(state, "braten").queued).toEqual([
+      { orderId: "e2", pager: 5, waiting: 1 },
+    ]);
+    expect(rowFor(state, "pommes").next).toMatchObject({ pager: 5 });
+    expect(nextOrderFor(state, "braten")?.pager).toBe(12);
+    expect(nextOrderFor(state, "braten", "e1")?.pager).toBe(5);
+    expect(nextOrderFor(state, "maultaschen")).toBeNull();
+  });
+
+  it("keeps the next order at the top until all its plates of that product are buzzed", () => {
+    const log = testLog();
+    const first = log.add({
+      type: "orderTaken",
+      pager: 12,
+      plates: [{ productId: "braten", count: 2 }],
+    });
+    log.add({
+      type: "orderTaken",
+      pager: 5,
+      plates: [{ productId: "braten", count: 1 }],
+    });
+    log.add({
+      type: "platesBuzzed",
+      orderId: first.id,
+      productId: "braten",
+      count: 1,
+    });
+    expect(rowFor(fold(log.events), "braten").next).toMatchObject({
+      pager: 12,
+      calledCount: 1,
+      plateCount: 2,
+      waiting: 1,
+    });
+
+    log.add({
+      type: "platesBuzzed",
+      orderId: first.id,
+      productId: "braten",
+      count: 1,
+    });
+    const state = fold(log.events);
+    expect(rowFor(state, "braten").next).toMatchObject({ pager: 5 });
+    expect(rowFor(state, "braten").queued).toEqual([]);
+  });
+
+  it("marks a sold-out product's row", () => {
+    const log = testLog();
+    log.add({ type: "soldOutMarked", productId: "pommes" });
+    const state = fold(log.events);
+    expect(rowFor(state, "pommes").soldOut).toBe(true);
+    expect(rowFor(state, "braten").soldOut).toBe(false);
+  });
+});
