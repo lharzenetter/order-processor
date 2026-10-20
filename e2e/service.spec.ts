@@ -96,3 +96,40 @@ test("Rückgängig reverts the last action and names it", async ({ page }) => {
   await expect(undo).toBeDisabled();
   await expect(undo).toContainText("nichts rückgängig zu machen");
 });
+
+// GitHub issue #1: on the window iPad the create button was cut off below the pager quick-taps.
+test("the create button stays on screen in the intake", async ({ page }) => {
+  await openApp(page);
+  await page.getByRole("button", { name: /^\+ Neue Bestellung/ }).click();
+  const intake = page.getByRole("dialog", { name: "Neue Bestellung" });
+  // A missing pager adds the Fehlend line, the tallest the pager column gets.
+  await intake.getByRole("button", { name: "Fehlt…" }).click();
+  await intake
+    .getByRole("button", { name: "Pager 30 als fehlend markieren" })
+    .click();
+  await intake.getByRole("button", { name: "Fertig" }).click();
+
+  await expect(
+    intake.getByRole("button", { name: /^Bestellung anlegen/ }),
+  ).toBeInViewport({ ratio: 1 });
+});
+
+// GitHub issue #1: when the dialog has to scroll, the create button stays pinned at its bottom.
+test("the create button stays pinned when the intake scrolls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1180, height: 560 });
+  await openApp(page);
+  await page.getByRole("button", { name: /^\+ Neue Bestellung/ }).click();
+  const intake = page.getByRole("dialog", { name: "Neue Bestellung" });
+  const create = intake.getByRole("button", { name: /^Bestellung anlegen/ });
+  await expect(
+    intake.getByRole("button", { name: "Pager 30" }),
+  ).not.toBeInViewport();
+  await expect(create).toBeInViewport({ ratio: 1 });
+
+  await intake
+    .getByRole("button", { name: "Pager 30" })
+    .scrollIntoViewIfNeeded();
+  await expect(create).toBeInViewport({ ratio: 1 });
+});
