@@ -104,17 +104,17 @@
 
 /* Rare actions sit behind one tap, so they are findable but never tapped by mistake. */
 .rare {
-  margin: 20px -28px -20px;
-  border-top: 1px solid var(--taupe);
-  background: var(--gray-light);
-}
-
-.rare summary {
   display: flex;
   align-items: center;
+  width: calc(100% + 56px);
   min-height: 52px;
+  margin: 20px -28px -20px;
   padding: 0 28px;
+  border: 0;
+  border-top: 1px solid var(--taupe);
+  background: var(--gray-light);
   font-size: 17px;
+  text-align: left;
   cursor: pointer;
 }
 
@@ -122,7 +122,6 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  padding: 0 28px 20px;
 }
 
 .rareAction {

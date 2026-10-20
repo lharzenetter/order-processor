@@ -43,6 +43,7 @@ export function OrderDialog({
   actions: LineActions;
 }) {
   const view = orderView(state, orderId, now);
+  const [rare, setRare] = useState(false);
   const [abandoning, setAbandoning] = useState(false);
   if (!view?.open) {
     return null;
@@ -78,31 +79,47 @@ export function OrderDialog({
         onClose={onClose}
         onHandOver={onHandOver}
       />
-      <details className={styles.rare}>
-        <summary>Etwas stimmt nicht …</summary>
-        <div className={styles.rareActions}>
-          {view.lines.map((line) => (
-            <RareLineActions
-              key={line.productId}
-              state={state}
-              orderId={view.orderId}
-              line={line}
-              onCancelPlate={onCancelPlate}
-              actions={actions}
-            />
-          ))}
-          <button
-            type="button"
-            className={cx(styles.rareAction, styles.abandon)}
-            onClick={() => {
-              setAbandoning(true);
-            }}
-          >
-            Verwaiste Bestellung schließen…
-            <small>Gast ist weg</small>
-          </button>
-        </div>
-      </details>
+      <button
+        type="button"
+        className={styles.rare}
+        onClick={() => {
+          setRare(true);
+        }}
+      >
+        Etwas stimmt nicht …
+      </button>
+      {/* Its own dialog starts at the top, so a long order never pushes the actions out of sight. */}
+      {rare && (
+        <ModalDialog
+          title={`Pager ${String(view.pager)} — etwas stimmt nicht`}
+          onClose={() => {
+            setRare(false);
+          }}
+        >
+          <div className={styles.rareActions}>
+            {view.lines.map((line) => (
+              <RareLineActions
+                key={line.productId}
+                state={state}
+                orderId={view.orderId}
+                line={line}
+                onCancelPlate={onCancelPlate}
+                actions={actions}
+              />
+            ))}
+            <button
+              type="button"
+              className={cx(styles.rareAction, styles.abandon)}
+              onClick={() => {
+                setAbandoning(true);
+              }}
+            >
+              Verwaiste Bestellung schließen…
+              <small>Gast ist weg</small>
+            </button>
+          </div>
+        </ModalDialog>
+      )}
       {abandoning && (
         <ModalDialog
           title={`Bestellung auf Pager ${String(view.pager)} schließen?`}

@@ -148,3 +148,50 @@ test("a pager with the guest can't be picked in the intake", async ({
     intake.getByRole("button", { name: "Pager 8", exact: true }),
   ).toBeEnabled();
 });
+
+// On a long order the folded-out rare actions used to land below the popup's visible edge.
+test("Etwas stimmt nicht shows its actions at once, even on a long order", async ({
+  page,
+}) => {
+  await openApp(page);
+  await takeOrder(
+    page,
+    {
+      Braten: 1,
+      Schäufele: 1,
+      Schlachtplatte: 1,
+      Maultaschen: 1,
+      Schupfnudeln: 1,
+      Fleischkäs: 1,
+      Pfannkuchen: 1,
+      Pommes: 2,
+    },
+    4,
+  );
+  await page.getByRole("button", { name: /^Gast zeigt Pager …/ }).click();
+  const keypad = page.getByRole("dialog", { name: "Ausgabe — Pager-Nummer" });
+  await keypad.getByRole("button", { name: "Ziffer 4" }).click();
+  await keypad.getByRole("button", { name: "Bestellung zeigen" }).click();
+
+  await page
+    .getByRole("dialog", { name: "Pager 4" })
+    .getByRole("button", { name: "Etwas stimmt nicht …" })
+    .click();
+  const rare = page.getByRole("dialog", {
+    name: "Pager 4 — etwas stimmt nicht",
+  });
+  await expect(
+    rare.getByRole("button", { name: /^1 Braten stornieren/ }),
+  ).toBeInViewport({ ratio: 1 });
+
+  // Stornieren takes one plate per tap, so the dialog stays open for the next one.
+  await rare.getByRole("button", { name: /^1 Pommes stornieren/ }).click();
+  await rare.getByRole("button", { name: /^1 Pommes stornieren/ }).click();
+  await expect(
+    rare.getByRole("button", { name: /^1 Pommes stornieren/ }),
+  ).toBeHidden();
+
+  await page.keyboard.press("Escape");
+  await expect(rare).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Pager 4" })).toBeVisible();
+});

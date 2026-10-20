@@ -32,7 +32,10 @@ export function ModalDialog({
 
   function handleCancel(event: SyntheticEvent<HTMLDialogElement>): void {
     event.preventDefault();
-    onClose?.();
+    // React bubbles a stacked dialog's cancel up to the dialog it sits in; only the top one closes.
+    if (event.target === event.currentTarget) {
+      onClose?.();
+    }
   }
 
   function handleClick(event: SyntheticEvent<HTMLDialogElement>): void {
