@@ -6,7 +6,7 @@ import type { DeviceStore, Meta } from "../storage/index";
 
 // The time-dependent selectors (time since a buzz, re-buzz due) stay current this way; there are
 // no tick events (spec, "Selectors").
-const RENDER_EVERY_MS = 5_000;
+const RENDER_EVERY_MS = 1_000;
 
 export type BoardStatus =
   | { readonly kind: "loading" }
