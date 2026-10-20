@@ -196,7 +196,7 @@ export function Verwaltung({
           </span>
           <button
             type="button"
-            className={shared.go}
+            className={shared.primary}
             disabled={!device.updateWaiting}
             onClick={device.update}
           >

@@ -1,48 +1,152 @@
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pagerTile {
+  width: 72px;
+  height: 72px;
+  border-width: 3px;
+  font-size: 40px;
+}
+
+.headingText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headingText small {
+  font-size: 16px;
+}
+
 .note {
-  display: block;
-  margin-bottom: 10px;
+  margin: 0 0 8px;
   padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--navy);
+  color: var(--white);
   font-size: 22px;
 }
 
 .line {
-  margin: 8px 0;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 84px;
+  border-bottom: 1px solid var(--gray-light);
 }
 
-.rebuzz {
-  border-color: var(--warn);
-  box-shadow: 0 0 0 2px var(--warn) inset;
+.lineText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 16px;
 }
 
 .lineTitle {
-  font-size: 19px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
 }
 
-.lineInfo {
-  margin-top: 4px;
+.buzzed {
+  color: var(--navy);
+}
+
+.overdue {
+  color: var(--dark-red);
+  font-weight: 700;
 }
 
 .stepper {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+}
+
+.stepper button {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid var(--black);
+  font-size: 26px;
 }
 
 .stepper b {
-  min-width: 28px;
-  font-size: 22px;
+  width: 64px;
+  font-size: 32px;
   text-align: center;
 }
 
 .footer {
-  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.consequence {
+  margin: 0;
+  font-size: 16px;
+}
+
+.close {
+  height: 64px;
+  padding: 0 24px;
+}
+
+.handOver {
+  height: 64px;
+  font-size: 22px;
+}
+
+/* Rare actions sit behind one tap, so they are findable but never tapped by mistake. */
+.rare {
+  margin: 20px -28px -20px;
+  border-top: 1px solid var(--taupe);
+  background: var(--gray-light);
+}
+
+.rare summary {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.rareActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 28px 20px;
+}
+
+.rareAction {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  padding: 6px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.rareAction small {
+  color: var(--gray-dark);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.abandon {
+  border-color: var(--dark-red);
+  color: var(--dark-red);
 }
 
 .stack {

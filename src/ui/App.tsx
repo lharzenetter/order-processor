@@ -10,17 +10,19 @@ import type { EventBody, PlateCount, State } from "../core/index";
 import styles from "./App.module.css";
 import { SoldOutBanners, StandaloneBanner } from "./Banners";
 import { Board } from "./Board";
+import { cx } from "./cx";
 import { GerufenColumn } from "./GerufenColumn";
-import type { LineActions } from "./GerufenColumn";
 import { Header } from "./Header";
 import { IntakeDialog } from "./IntakeDialog";
 import { OrderDialog } from "./OrderDialog";
+import type { LineActions } from "./OrderDialog";
 import shared from "./shared.module.css";
 import {
   AusgabeDialog,
   PagerReturnDialog,
   SoldOutDialog,
 } from "./SmallDialogs";
+import { StepHeading } from "./StepHeading";
 import { Toasts, useToasts } from "./Toasts";
 import { useDevice } from "./use-device";
 import { usePagerBoard } from "./use-pager-board";
@@ -93,9 +95,6 @@ export function App() {
   }
 
   const lineActions: LineActions = {
-    onRebuzz(orderId, productId) {
-      void run({ type: "rebuzzed", orderId, productId });
-    },
     onHandOn(orderId, productId) {
       const target = handOnTarget(state, orderId, productId);
       if (target === null) {
@@ -112,7 +111,7 @@ export function App() {
         }
       });
     },
-    onSendBack(orderId, productId) {
+    onBackToQueue(orderId, productId) {
       void run({ type: "plateSentBackToQueue", orderId, productId }).then(
         (next) => {
           if (next !== null) {
@@ -182,10 +181,11 @@ export function App() {
       />
       <SoldOutBanners state={state} onOpenOrder={openOrder} />
       <div className={styles.shell}>
-        <aside className={styles.rail}>
+        <section className={styles.intake} aria-labelledby="step-annehmen">
+          <StepHeading id="step-annehmen" step="1" title="Annehmen" />
           <button
             type="button"
-            className={shared.go}
+            className={cx(shared.primary, styles.newOrder)}
             disabled={allOut}
             onClick={() => {
               setDialog({ kind: "intake" });
@@ -195,40 +195,36 @@ export function App() {
               "Alle Pager vergeben"
             ) : (
               <>
-                + Neue Bestellung
+                <span className={styles.plus}>+</span> Neue Bestellung
                 <small>{free.length} Pager frei</small>
               </>
             )}
           </button>
-          <button
-            type="button"
-            className={shared.primary}
-            onClick={() => {
-              setDialog({ kind: "ausgabe" });
-            }}
-          >
-            Ausgabe…
-            <small>Pager-Nummer eintippen</small>
-          </button>
-        </aside>
-        <main className={styles.main}>
-          <Board
-            state={state}
-            onBuzz={(orderId, productId, count) => {
-              void run({ type: "platesBuzzed", orderId, productId, count });
-            }}
-            onOpenOrder={openOrder}
-          />
-          <GerufenColumn
-            state={state}
-            now={now}
-            onHandOver={(orderId, productId, count) => {
-              void handOver(orderId, [{ productId, count }]);
-            }}
-            onOpenOrder={openOrder}
-            actions={lineActions}
-          />
-        </main>
+          <p className={cx(shared.muted, styles.intakeHint)}>
+            Bon abtippen, Pager vom Stapel nehmen, Nummer antippen.
+          </p>
+        </section>
+        <Board
+          state={state}
+          onBuzz={(orderId, productId, count) => {
+            void run({ type: "platesBuzzed", orderId, productId, count });
+          }}
+          onOpenOrder={openOrder}
+        />
+        <GerufenColumn
+          state={state}
+          now={now}
+          onShowPager={() => {
+            setDialog({ kind: "ausgabe" });
+          }}
+          onHandOver={(orderId, productId, count) => {
+            void handOver(orderId, [{ productId, count }]);
+          }}
+          onRebuzz={(orderId, productId) => {
+            void run({ type: "rebuzzed", orderId, productId });
+          }}
+          onOpenOrder={openOrder}
+        />
       </div>
 
       {dialog?.kind === "intake" && (

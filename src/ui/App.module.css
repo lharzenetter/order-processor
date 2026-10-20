@@ -5,47 +5,51 @@
   height: 100dvh;
 }
 
+/* Three step columns side by side; separation by rules, not cards. */
 .shell {
   display: flex;
   flex: 1;
   min-height: 0;
 }
 
-.rail {
+.intake {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 10px;
-  width: 180px;
-  padding: 10px;
-  border-right: 1px solid var(--line);
-  background: var(--panel);
+  gap: 16px;
+  width: 210px;
+  padding: 20px 16px;
+  border-right: 1px solid var(--taupe);
 }
 
-.rail button {
-  min-height: 140px;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.15;
+.newOrder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 160px;
+  padding: 16px;
+  font-size: 22px;
+  line-height: 1.1;
   text-align: left;
 }
 
-.rail small {
-  display: block;
-  margin-top: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  opacity: 0.8;
+.plus {
+  font-size: 44px;
+  line-height: 1;
 }
 
-.main {
-  display: grid;
-  flex: 1;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 10px;
-  min-width: 0;
-  min-height: 0;
-  padding: 10px;
+.newOrder small {
+  color: var(--on-navy-muted);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.intakeHint {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .message {

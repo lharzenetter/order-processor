@@ -4,17 +4,26 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: var(--sold-bg);
-  color: var(--sold);
-  font-weight: 600;
+  background: var(--dark-red);
+  color: var(--white);
+  font-weight: 700;
 }
 
 .standalone {
   flex: none;
   padding: 10px 12px;
-  background: var(--accent);
+  background: var(--dark-red);
   color: #fff;
   font-size: 18px;
   font-weight: 700;
   text-align: center;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: var(--white);
+  color: var(--dark-red);
+  font-weight: 700;
 }

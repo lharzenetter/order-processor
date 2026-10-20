@@ -1,41 +1,36 @@
+/* One rule to learn: the dark button is the next thing to do. */
 .primary {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #fff;
-  font-weight: 600;
+  border: 0;
+  background: var(--navy);
+  color: var(--white);
+  font-weight: 700;
 }
 
-.go {
-  border-color: var(--go);
-  background: var(--go);
-  color: #fff;
-  font-weight: 600;
+.secondary {
+  border: 2px solid var(--navy);
+  background: var(--white);
+  color: var(--navy);
+  font-weight: 700;
 }
 
-.warn {
-  border-color: var(--warn);
-  background: var(--warn);
-  color: #fff;
-  font-weight: 600;
+.link {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
 }
 
 .danger {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.ghost {
-  background: transparent;
-}
-
-.small {
-  min-height: 36px;
-  padding: 6px 10px;
-  font-size: 14px;
+  border: 2px solid var(--dark-red);
+  background: var(--white);
+  color: var(--dark-red);
+  font-weight: 700;
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--gray-dark);
 }
 
 .row {
@@ -54,37 +49,36 @@
 
 .heading {
   margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--gray-dark);
+  font-size: 16px;
+  font-weight: 400;
 }
 
-.chip {
+.tag {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--dark-red);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* A pager number as a square tile; tappable ones get a black outline. */
+.tile {
   display: inline-flex;
+  flex: none;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 44px;
-  min-height: 36px;
-  padding: 4px 10px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--chip);
+  min-width: 52px;
+  height: 52px;
+  padding: 0 4px;
+  border: 2px solid var(--black);
+  background: var(--white);
+  color: var(--black);
+  font-size: 24px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-.chipBuzzed {
-  background: var(--go-bg);
-  color: var(--go);
-}
-
-.chipRebuzz {
-  background: var(--warn-bg);
-  color: var(--warn);
-}
-
-.pulse {
-  animation: pulse 1.2s infinite;
+  line-height: 1;
 }

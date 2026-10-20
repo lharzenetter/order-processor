@@ -1,63 +1,101 @@
 .column {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   min-height: 0;
-  padding: 10px;
+  padding: 20px 20px 16px;
   overflow: auto;
-  border-radius: 12px;
-  background: var(--panel);
 }
 
 .board {
-  width: 100%;
-  border-collapse: collapse;
+  display: flex;
+  flex-direction: column;
+  border-top: 2px solid var(--black);
 }
 
-.board td,
-.board th {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  vertical-align: middle;
+.row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  border-bottom: 1px solid var(--gray-light);
+}
+
+/* Nobody waits: a thin grey line, so the busy dishes stand out. */
+.idle {
+  height: 34px;
+  color: var(--gray-dark);
+  font-size: 16px;
 }
 
 .label {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   width: 150px;
-  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.1;
 }
 
-.sold .label {
-  color: var(--sold);
+.idle .label {
+  font-size: 16px;
 }
 
-.nextChip {
-  min-width: 64px;
-  font-size: 22px;
+.struck {
+  text-decoration: line-through;
 }
 
-.progress {
-  color: var(--muted);
+.nobody {
+  font-size: 14px;
+}
+
+.next {
+  width: 56px;
+}
+
+.next small {
+  color: var(--gray-dark);
   font-size: 13px;
-  white-space: nowrap;
+  font-weight: 400;
 }
 
-.actions {
-  white-space: nowrap;
+.buzz {
+  flex: none;
+  width: 148px;
+  height: 52px;
+  font-size: 18px;
 }
 
-.actions button + button {
-  margin-left: 4px;
+.all {
+  flex: none;
+  width: 76px;
+  height: 52px;
+  padding: 0;
+  font-size: 16px;
 }
 
 .queue {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.queue span {
+  font-size: 14px;
 }
 
 .queueChip {
-  min-height: 28px;
-  font-size: 14px;
+  flex: none;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
 }

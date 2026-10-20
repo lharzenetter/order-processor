@@ -1,8 +1,6 @@
 import { soldOutWaiting } from "../core/index";
 import type { State } from "../core/index";
 import styles from "./Banners.module.css";
-import shared from "./shared.module.css";
-import { cx } from "./cx";
 
 export function SoldOutBanners({
   state,
@@ -21,7 +19,7 @@ export function SoldOutBanners({
         <button
           key={order.orderId}
           type="button"
-          className={cx(shared.chip, shared.small)}
+          className={styles.chip}
           aria-label={`Pager ${String(order.pager)} öffnen`}
           onClick={() => {
             onOpenOrder(order.orderId);

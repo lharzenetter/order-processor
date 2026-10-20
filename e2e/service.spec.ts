@@ -9,10 +9,10 @@ test("take an order, buzz it, hand it over and take the pager back", async ({
   await expect(page.getByText("1 offen · 29 Pager frei")).toBeVisible();
 
   await boardRow(page, "Braten")
-    .getByRole("button", { name: "7 rufen" })
+    .getByRole("button", { name: "Pager 7 rufen" })
     .click();
   await boardRow(page, "Pommes")
-    .getByRole("button", { name: "7 rufen" })
+    .getByRole("button", { name: "Pager 7 rufen" })
     .click();
   await expect(gerufenLine(page, 7, "Braten")).toBeVisible();
 
@@ -35,11 +35,11 @@ test("a partial pickup keeps the pager with the guest", async ({ page }) => {
   await openApp(page);
   await takeOrder(page, { Braten: 2 }, 12);
   await boardRow(page, "Braten")
-    .getByRole("button", { name: "12 rufen" })
+    .getByRole("button", { name: "Pager 12 rufen" })
     .click();
-  await expect(boardRow(page, "Braten")).toContainText("1 von 2 gerufen");
+  await expect(boardRow(page, "Braten")).toContainText("1/2");
 
-  await page.getByRole("button", { name: /Ausgabe…/ }).click();
+  await page.getByRole("button", { name: /^Gast zeigt Pager …/ }).click();
   const keypad = page.getByRole("dialog", { name: "Ausgabe — Pager-Nummer" });
   await keypad.getByRole("button", { name: "Ziffer 1" }).click();
   await keypad.getByRole("button", { name: "Ziffer 2" }).click();
@@ -64,7 +64,7 @@ test("a reload keeps the open orders", async ({ page }) => {
   await takeOrder(page, { Maultaschen: 1 }, 3);
   await takeOrder(page, { Maultaschen: 2 }, 9);
   await boardRow(page, "Maultaschen")
-    .getByRole("button", { name: "3 rufen" })
+    .getByRole("button", { name: "Pager 3 rufen" })
     .click();
   // Shown only once it is stored.
   await expect(gerufenLine(page, 3, "Maultaschen")).toBeVisible();
@@ -72,14 +72,14 @@ test("a reload keeps the open orders", async ({ page }) => {
   await page.reload();
   await expect(page.getByText("2 offen · 28 Pager frei")).toBeVisible();
   await expect(gerufenLine(page, 3, "Maultaschen")).toBeVisible();
-  await expect(boardRow(page, "Maultaschen")).toContainText("0 von 2 gerufen");
+  await expect(boardRow(page, "Maultaschen")).toContainText("0/2");
 });
 
 test("Rückgängig reverts the last action and names it", async ({ page }) => {
   await openApp(page);
   await takeOrder(page, { Schäufele: 1 }, 5);
   await boardRow(page, "Schäufele")
-    .getByRole("button", { name: "5 rufen" })
+    .getByRole("button", { name: "Pager 5 rufen" })
     .click();
 
   const undo = page.getByRole("button", { name: /Rückgängig/ });
@@ -89,7 +89,7 @@ test("Rückgängig reverts the last action and names it", async ({ page }) => {
     "Rückgängig: Schäufele gerufen → Pager 5",
   );
   await expect(gerufenLine(page, 5, "Schäufele")).toBeHidden();
-  await expect(boardRow(page, "Schäufele")).toContainText("0 von 1 gerufen");
+  await expect(boardRow(page, "Schäufele")).toContainText("0/1");
 
   await undo.click();
   await expect(page.getByText("0 offen · 30 Pager frei")).toBeVisible();
@@ -103,7 +103,7 @@ test("the create button stays on screen in the intake", async ({ page }) => {
   await page.getByRole("button", { name: /^\+ Neue Bestellung/ }).click();
   const intake = page.getByRole("dialog", { name: "Neue Bestellung" });
   // A missing pager adds the Fehlend line, the tallest the pager column gets.
-  await intake.getByRole("button", { name: "Fehlt…" }).click();
+  await intake.getByRole("button", { name: "Pager fehlt…" }).click();
   await intake
     .getByRole("button", { name: "Pager 30 als fehlend markieren" })
     .click();
@@ -118,7 +118,7 @@ test("the create button stays on screen in the intake", async ({ page }) => {
 test("the create button stays pinned when the intake scrolls", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1180, height: 560 });
+  await page.setViewportSize({ width: 1180, height: 480 });
   await openApp(page);
   await page.getByRole("button", { name: /^\+ Neue Bestellung/ }).click();
   const intake = page.getByRole("dialog", { name: "Neue Bestellung" });
@@ -132,4 +132,19 @@ test("the create button stays pinned when the intake scrolls", async ({
     .getByRole("button", { name: "Pager 30" })
     .scrollIntoViewIfNeeded();
   await expect(create).toBeInViewport({ ratio: 1 });
+});
+
+test("a pager with the guest can't be picked in the intake", async ({
+  page,
+}) => {
+  await openApp(page);
+  await takeOrder(page, { Pommes: 1 }, 7);
+  await page.getByRole("button", { name: /^\+ Neue Bestellung/ }).click();
+  const intake = page.getByRole("dialog", { name: "Neue Bestellung" });
+  await expect(
+    intake.getByRole("button", { name: "Pager 7, beim Gast" }),
+  ).toBeDisabled();
+  await expect(
+    intake.getByRole("button", { name: "Pager 8", exact: true }),
+  ).toBeEnabled();
 });

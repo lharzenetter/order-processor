@@ -27,9 +27,9 @@ export async function takeOrder(
         .click();
     }
   }
-  for (const digit of String(pager)) {
-    await intake.getByRole("button", { name: `Ziffer ${digit}` }).click();
-  }
+  await intake
+    .getByRole("button", { name: `Pager ${String(pager)}`, exact: true })
+    .click();
   const total = Object.values(plates).reduce((a, b) => a + b, 0);
   await intake
     .getByRole("button", {
@@ -43,7 +43,9 @@ export async function takeOrder(
 }
 
 export function boardRow(page: Page, label: string) {
-  return page.getByRole("row", { name: label, exact: true });
+  return page
+    .getByRole("list", { name: "Übersicht" })
+    .getByRole("listitem", { name: label, exact: true });
 }
 
 export function gerufenLine(page: Page, pager: number, label: string) {

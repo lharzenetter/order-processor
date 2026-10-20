@@ -18,15 +18,12 @@ export function Header({
   const soldOutCount = state.soldOut.length;
   return (
     <header className={styles.header}>
-      <span className={styles.title}>Kirbe Essensausgabe</span>
-      <span className={styles.counts}>
-        {openOrders} offen · {freePagers} Pager frei
-      </span>
-      <span className={styles.grow} />
-      <button type="button" onClick={onSoldOut}>
-        Ausverkauft markieren
-        {soldOutCount > 0 && ` (${String(soldOutCount)})`}
-      </button>
+      <div className={styles.titles}>
+        <span className={styles.title}>Kirbe Essensausgabe</span>
+        <span className={styles.counts}>
+          {openOrders} offen · {freePagers} Pager frei
+        </span>
+      </div>
       <button
         type="button"
         className={styles.undo}
@@ -36,9 +33,13 @@ export function Header({
         ↶ Rückgängig
         <small>{target?.label ?? "nichts rückgängig zu machen"}</small>
       </button>
+      <button type="button" className={styles.textButton} onClick={onSoldOut}>
+        Ausverkauft…
+        {soldOutCount > 0 && ` (${String(soldOutCount)})`}
+      </button>
       <button
         type="button"
-        className={styles.verwaltung}
+        className={styles.textButton}
         onClick={onVerwaltung}
       >
         Verwaltung

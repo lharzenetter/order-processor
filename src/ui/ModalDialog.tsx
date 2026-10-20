@@ -50,22 +50,20 @@ export function ModalDialog({
       onCancel={handleCancel}
       onClick={handleClick}
     >
-      <div className={styles.inner}>
-        <div className={styles.titleRow}>
-          <h2 className={styles.title}>{heading}</h2>
-          {onClose !== undefined && size !== "big" && (
-            <button
-              type="button"
-              className={styles.close}
-              aria-label="Fenster schließen"
-              onClick={onClose}
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        {children}
+      <div className={styles.titleRow}>
+        <h2 className={styles.title}>{heading}</h2>
+        {onClose !== undefined && size !== "big" && (
+          <button
+            type="button"
+            className={styles.close}
+            aria-label="Fenster schließen"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        )}
       </div>
+      <div className={styles.body}>{children}</div>
     </dialog>
   );
 }

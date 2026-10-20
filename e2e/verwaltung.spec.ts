@@ -62,7 +62,7 @@ test("Importieren replaces the log from an export, guarded", async ({
   await verwaltung.getByRole("button", { name: "← Zurück" }).click();
 
   await expect(page.getByText("1 offen · 29 Pager frei")).toBeVisible();
-  await page.getByRole("button", { name: /Ausgabe…/ }).click();
+  await page.getByRole("button", { name: /^Gast zeigt Pager …/ }).click();
   const keypad = page.getByRole("dialog", { name: "Ausgabe — Pager-Nummer" });
   await keypad.getByRole("button", { name: "Ziffer 1" }).click();
   await keypad.getByRole("button", { name: "Ziffer 7" }).click();

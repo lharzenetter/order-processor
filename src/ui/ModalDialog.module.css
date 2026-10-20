@@ -7,49 +7,61 @@
   overscroll-behavior: contain;
   padding: 0;
   border: 0;
-  border-radius: 16px;
-  background: var(--bg);
-  color: var(--ink);
-  box-shadow: 0 10px 40px rgb(0 0 0 / 30%);
+  border-top: 4px solid var(--red);
+  border-radius: 0;
+  background: var(--white);
+  color: var(--black);
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 45%);
+  background: rgb(13 19 61 / 75%);
 }
 
 .wide {
-  width: min(1100px, 96vw);
+  width: min(1132px, 96vw);
 }
 
 .big {
   width: min(560px, 92vw);
-  background: var(--panel);
   text-align: center;
-}
-
-.inner {
-  padding: 16px;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  min-height: 72px;
+  padding: 10px 16px 10px 28px;
+  border-bottom: 1px solid var(--gray-light);
 }
 
 .title {
   flex: 1;
   margin: 0;
-  font-size: 24px;
+  font-size: 30px;
+  font-weight: 400;
 }
 
 .big .title {
   font-size: 44px;
+  font-weight: 700;
+}
+
+.body {
+  padding: 16px 28px 20px;
+}
+
+/* The intake lays out its own columns and footer edge to edge. */
+.wide .body {
+  padding: 0;
 }
 
 .close {
+  align-self: flex-start;
+  width: 52px;
+  height: 52px;
+  padding: 0;
   border: 0;
   background: transparent;
-  font-size: 20px;
+  font-size: 28px;
 }

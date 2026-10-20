@@ -5,26 +5,26 @@ import {
   MENU,
   pagerCheck,
   pagerOverview,
-  PAGER_COUNT,
 } from "../core/index";
-import type { PagerCheck, PlateCount, State } from "../core/index";
+import type { PlateCount, State } from "../core/index";
 import { cx } from "./cx";
 import styles from "./IntakeDialog.module.css";
-import { Keypad, PagerDisplay, pressKey } from "./Keypad";
 import { ModalDialog } from "./ModalDialog";
+import { pagerTiles } from "./pager-tiles";
+import type { PagerTile, PagerTileStatus } from "./pager-tiles";
 import shared from "./shared.module.css";
+import { SoldOutTag } from "./SoldOutTag";
+import { StepHeading } from "./StepHeading";
 
-const HINTS: Readonly<Record<PagerCheck, (pager: string) => string>> = {
-  empty: () => "Pager-Nummer eintippen oder antippen",
-  outOfRange: () => `Pager gibt es von 1 bis ${String(PAGER_COUNT)}`,
-  attached: (pager) => `Pager ${pager} hängt noch an einer offenen Bestellung`,
-  missing: (pager) =>
-    `Pager ${pager} ist als fehlend markiert — mit „Bestellung anlegen“ wird er wieder freigegeben`,
-  free: () => "",
+const TILE_SUBLINE: Readonly<Record<PagerTileStatus, string>> = {
+  free: "",
+  attached: "beim Gast",
+  missing: "fehlt",
+  selected: "gewählt",
 };
 
 /**
- * Neue Bestellung: the dishes from the Bon, then the pager. It always opens empty: closing it
+ * Neue Bestellung: A the dishes from the Bon, then B the pager. It always opens empty: closing it
  * throws the draft away (decided in "Window screen prototype").
  */
 export function IntakeDialog({
@@ -41,23 +41,18 @@ export function IntakeDialog({
   onRestore: (pager: number) => void;
 }) {
   const [draft, setDraft] = useState<Readonly<Record<string, number>>>({});
-  const [digits, setDigits] = useState("");
+  const [pager, setPager] = useState<number | null>(null);
   const [missingMode, setMissingMode] = useState(false);
   const [confirmSoldOut, setConfirmSoldOut] = useState<string | null>(null);
 
-  const pager = digits === "" ? null : Number(digits);
+  const overview = pagerOverview(state);
   const check = pagerCheck(state, pager);
-  const bad = check === "attached" || check === "outOfRange";
   const plates = MENU.flatMap(({ id }) => {
     const count = draft[id] ?? 0;
     return count > 0 ? [{ productId: id, count }] : [];
   });
   const plateTotal = plates.reduce((total, p) => total + p.count, 0);
-  const canStart =
-    pager !== null &&
-    plateTotal > 0 &&
-    (check === "free" || check === "missing");
-  const { free, missing } = pagerOverview(state);
+  const canStart = pager !== null && plateTotal > 0 && acceptsIntake(check);
 
   function add(productId: string): void {
     setDraft((current) => ({
@@ -74,14 +69,39 @@ export function IntakeDialog({
     add(productId);
   }
 
+  function tapPager(tile: PagerTile): void {
+    if (!missingMode) {
+      setPager(tile.pager);
+    } else if (tile.missing) {
+      onRestore(tile.pager);
+    } else {
+      onMarkMissing(tile.pager);
+    }
+  }
+
+  function tileName(tile: PagerTile): string {
+    if (!missingMode) {
+      return tile.name;
+    }
+    const pagerName = `Pager ${String(tile.pager)}`;
+    return tile.missing
+      ? `${pagerName} wieder freigeben`
+      : `${pagerName} als fehlend markieren`;
+  }
+
   const soldOutLabel =
     confirmSoldOut === null ? undefined : labelOf(confirmSoldOut);
 
   return (
     <ModalDialog title="Neue Bestellung" size="wide" onClose={onClose}>
       <div className={styles.columns}>
-        <div>
-          <h3 className={shared.heading}>Bon — jeden Teller antippen</h3>
+        <section className={styles.dishes}>
+          <StepHeading
+            level={3}
+            step="A"
+            title="Bon abtippen"
+            hint="ein Tipp = ein Teller"
+          />
           <div className={styles.products}>
             {MENU.map(({ id, label }) => {
               const count = draft[id] ?? 0;
@@ -89,7 +109,7 @@ export function IntakeDialog({
               return (
                 <div
                   key={id}
-                  className={cx(styles.product, soldOut && styles.sold)}
+                  className={cx(styles.product, count > 0 && styles.counted)}
                 >
                   <button
                     type="button"
@@ -99,15 +119,16 @@ export function IntakeDialog({
                       tapProduct(id);
                     }}
                   >
-                    {soldOut && <span className={styles.tag}>ausverkauft</span>}
                     {label}
+                    {soldOut && <SoldOutTag />}
                   </button>
                   {count > 0 && (
                     <>
+                      <span className={styles.count}>{count}</span>
                       <button
                         type="button"
                         className={styles.minus}
-                        aria-label={`${label} einen weniger`}
+                        aria-label={`Einen Teller ${label} weniger`}
                         onClick={() => {
                           setDraft((current) => ({
                             ...current,
@@ -117,95 +138,70 @@ export function IntakeDialog({
                       >
                         −
                       </button>
-                      <span className={styles.count}>{count}</span>
                     </>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
-        <div className={styles.pagerColumn}>
-          <h3 className={shared.heading}>Pager</h3>
-          <PagerDisplay digits={digits} label="Pager-Nummer" bad={bad} />
-          <div className={cx(styles.hint, bad && styles.bad)} role="note">
-            {HINTS[check](pager === null ? "" : String(pager))}
-          </div>
-          <Keypad
-            onKey={(key) => {
-              setDigits((current) => pressKey(current, key));
-            }}
-          />
+        </section>
+        <section className={styles.pagers}>
           <div className={shared.row}>
-            <h3 className={cx(shared.heading, shared.grow, styles.subheading)}>
-              {missingMode
-                ? "Pager antippen, um ihn als fehlend zu markieren"
-                : "Freie Pager"}
-            </h3>
+            <span className={shared.grow}>
+              <StepHeading level={3} step="B" title="Pager antippen" />
+            </span>
             <button
               type="button"
-              className={cx(shared.small, shared.ghost)}
+              className={cx(missingMode && shared.secondary)}
+              aria-pressed={missingMode}
               onClick={() => {
                 setMissingMode((on) => !on);
               }}
             >
-              {missingMode ? "Fertig" : "Fehlt…"}
+              {missingMode ? "Fertig" : "Pager fehlt…"}
             </button>
           </div>
-          <div
-            className={cx(styles.quick, missingMode && styles.missingMode)}
-            role="group"
-            aria-label="Freie Pager"
-          >
-            {free.map((number) => (
+          <p className={styles.hint} role="note">
+            {missingMode
+              ? "Freien Pager antippen: fehlt. Gestrichelten antippen: wieder da."
+              : check === "missing" && pager !== null
+                ? `Pager ${String(pager)} ist als fehlend markiert — mit „Bestellung anlegen“ wird er wieder freigegeben`
+                : ""}
+          </p>
+          {/* A fixed 6 × 5 grid: every pager number always sits in the same place. */}
+          <div className={styles.grid} role="group" aria-label="Pager">
+            {pagerTiles(overview, pager).map((tile) => (
               <button
-                key={number}
+                key={tile.pager}
                 type="button"
-                className={cx(pager === number && styles.selected)}
-                aria-label={
-                  missingMode
-                    ? `Pager ${String(number)} als fehlend markieren`
-                    : `Pager ${String(number)}`
-                }
+                className={cx(styles.tile, styles[tile.status])}
+                disabled={tile.status === "attached"}
+                aria-pressed={tile.status === "selected"}
+                aria-label={tileName(tile)}
                 onClick={() => {
-                  if (missingMode) {
-                    onMarkMissing(number);
-                  } else {
-                    setDigits(String(number));
-                  }
+                  tapPager(tile);
                 }}
               >
-                {number}
+                {tile.pager}
+                <small>{TILE_SUBLINE[tile.status]}</small>
               </button>
             ))}
           </div>
-          {missing.length > 0 && (
-            <div className={shared.muted}>
-              Fehlend:{" "}
-              {missing.map((number) => (
-                <button
-                  key={number}
-                  type="button"
-                  className={cx(shared.small, shared.ghost)}
-                  aria-label={`Pager ${String(number)} wieder freigeben`}
-                  onClick={() => {
-                    onRestore(number);
-                  }}
-                >
-                  {number} ↺
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          <p className={cx(shared.muted, styles.legend)}>
+            <span>Weiß = frei</span>
+            <span>Grau = beim Gast</span>
+            <span>Gestrichelt = fehlt</span>
+            <span>Dunkel = gewählt</span>
+          </p>
+        </section>
       </div>
       <div className={cx(shared.row, styles.footer)}>
-        <button type="button" className={shared.ghost} onClick={onClose}>
+        <button type="button" className={styles.cancel} onClick={onClose}>
           Abbrechen
         </button>
         <button
           type="button"
-          className={cx(shared.go, shared.grow)}
+          className={cx(shared.primary, shared.grow, styles.create)}
           disabled={!canStart}
           onClick={() => {
             if (pager !== null) {
@@ -233,7 +229,7 @@ export function IntakeDialog({
           <div className={styles.stack}>
             <button
               type="button"
-              className={shared.warn}
+              className={shared.primary}
               onClick={() => {
                 add(confirmSoldOut);
                 setConfirmSoldOut(null);

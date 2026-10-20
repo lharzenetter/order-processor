@@ -4,7 +4,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--white);
 }
 
 .top {
@@ -13,16 +13,17 @@
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  background: var(--ink);
-  color: #fff;
+  border-bottom: 4px solid var(--red);
+  background: var(--navy);
+  color: var(--white);
 }
 
 .back {
   min-width: 160px;
   min-height: 64px;
-  border-color: #555;
-  background: #333;
-  color: #fff;
+  border: 2px solid var(--white);
+  background: var(--navy);
+  color: var(--white);
   font-size: 22px;
   font-weight: 700;
 }
@@ -30,6 +31,7 @@
 .title {
   margin: 0;
   font-size: 26px;
+  font-weight: 400;
 }
 
 .body {
@@ -42,13 +44,13 @@
 .section {
   margin-bottom: 16px;
   padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--panel);
+  border-bottom: 1px solid var(--gray-light);
+  background: var(--white);
 }
 
 .danger {
   margin-top: 48px;
-  border: 2px solid var(--accent);
+  border: 2px solid var(--dark-red);
 }
 
 .actions {
@@ -81,11 +83,11 @@
 }
 
 .ok span:first-child {
-  color: var(--go);
+  color: var(--navy);
 }
 
 .bad span:first-child {
-  color: var(--accent);
+  color: var(--dark-red);
 }
 
 .visuallyHidden {
@@ -100,9 +102,8 @@
 .recovery,
 .error {
   padding: 12px;
-  border-radius: 10px;
-  background: var(--sold-bg);
-  color: var(--accent);
+  background: var(--dark-red);
+  color: var(--white);
   font-weight: 600;
 }
 
@@ -116,14 +117,14 @@
 .table {
   min-width: 600px;
   border-collapse: collapse;
-  background: var(--panel);
+  background: var(--white);
   font-size: 20px;
 }
 
 .table th,
 .table td {
   padding: 8px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--gray-light);
   text-align: left;
 }
 

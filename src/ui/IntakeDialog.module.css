@@ -1,122 +1,159 @@
 .columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: 520px minmax(0, 1fr);
+}
+
+.dishes,
+.pagers {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 20px 28px;
+}
+
+.dishes {
+  border-right: 1px solid var(--gray-light);
 }
 
 .products {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .product {
-  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 76px;
+  border: 2px solid var(--black);
+}
+
+.counted {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--white);
 }
 
 .productButton {
-  width: 100%;
-  min-height: 64px;
-  padding-right: 80px;
-  font-weight: 600;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1.1;
   text-align: left;
 }
 
-.sold .productButton {
-  border-color: var(--sold);
-  background: var(--sold-bg);
-  color: var(--sold);
-}
-
-.tag {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.count,
-.minus {
-  position: absolute;
-  top: 8px;
-  display: grid;
-  place-items: center;
-  height: 36px;
-  border-radius: 999px;
-}
-
 .count {
-  right: 8px;
-  min-width: 36px;
-  background: var(--ink);
-  color: #fff;
-  font-size: 18px;
-  pointer-events: none;
+  align-self: center;
+  width: 48px;
+  font-size: 30px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .minus {
-  right: 50px;
-  width: 36px;
-  min-height: 36px;
+  width: 56px;
+  margin: 8px 8px 8px 0;
   padding: 0;
   border: 0;
-  background: var(--chip);
-  font-weight: 800;
-}
-
-.pagerColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.subheading {
-  margin: 6px 0;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 34px;
+  font-weight: 700;
 }
 
 .hint {
   min-height: 20px;
-  font-size: 14px;
+  margin: 0;
+  font-size: 15px;
 }
 
-.bad {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-/* Ten per row fits all 30 pagers in three rows on the iPad, with no scrolling. */
-.quick {
+.grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
 }
 
-.quick button {
-  min-width: 0;
-  padding: 6px;
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 66px;
+  padding: 0;
+  font-size: 24px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.quick .selected {
-  background: var(--ink);
-  color: #fff;
+.tile small {
+  min-height: 13px;
+  font-size: 13px;
+  font-weight: 400;
 }
 
-.missingMode button {
-  border-style: dashed;
-  color: var(--muted);
+.free {
+  border: 2px solid var(--black);
+}
+
+.attached {
+  border: 1px solid var(--gray-light);
+  background: var(--gray-light);
+  color: var(--gray-dark);
+}
+
+/* The state is in the subline too, so the grey tile reads without its opacity cue. */
+.attached:disabled {
+  opacity: 1;
+}
+
+.missing {
+  border: 2px dashed var(--gray-dark);
+  color: var(--gray-dark);
+}
+
+.selected {
+  border: 2px solid var(--navy);
+  background: var(--navy);
+  color: var(--white);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  font-size: 14px;
 }
 
 /* Missing pagers or sold-out tags can still make the dialog taller than the iPad's 820px; the
-   button then stays pinned while the rest scrolls under it (GitHub issue #1). The negative
-   margins cancel the dialog's padding so the bar spans its full width. */
+   button then stays pinned while the rest scrolls under it (GitHub issue #1). */
 .footer {
   position: sticky;
   bottom: 0;
-  margin: 12px -16px -16px;
-  padding: 12px 16px 16px;
-  background: var(--bg);
-  box-shadow: 0 -8px 12px -8px rgb(0 0 0 / 20%);
+  gap: 12px;
+  padding: 14px 28px;
+  border-top: 1px solid var(--gray-light);
+  background: var(--white);
+}
+
+.cancel {
+  height: 60px;
+  padding: 0 24px;
+}
+
+.create {
+  height: 60px;
+  font-size: 22px;
 }
 
 .stack {

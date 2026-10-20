@@ -1,8 +1,9 @@
 .button {
   position: relative;
   overflow: hidden;
-  border-color: var(--accent);
-  color: var(--accent);
+  border: 2px solid var(--dark-red);
+  color: var(--dark-red);
+  font-weight: 700;
   -webkit-touch-callout: none;
 }
 
@@ -10,7 +11,7 @@
   position: absolute;
   inset: 0;
   width: 0;
-  background: var(--sold-bg);
+  background: var(--gray-light);
 }
 
 .holding .fill {

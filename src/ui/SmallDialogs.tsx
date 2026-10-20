@@ -6,6 +6,7 @@ import { Keypad, PagerDisplay, pressKey } from "./Keypad";
 import { ModalDialog } from "./ModalDialog";
 import shared from "./shared.module.css";
 import styles from "./SmallDialogs.module.css";
+import { SoldOutTag } from "./SoldOutTag";
 
 /** Ausgabe…: the guest shows a pager; its number opens the order. */
 export function AusgabeDialog({
@@ -29,7 +30,7 @@ export function AusgabeDialog({
       <div className={styles.stack}>
         <button
           type="button"
-          className={shared.go}
+          className={shared.primary}
           disabled={digits === ""}
           onClick={() => {
             onShow(digits);
@@ -95,8 +96,8 @@ export function SoldOutDialog({
                 onToggle(id, !soldOut);
               }}
             >
-              {soldOut && <span className={styles.tag}>ausverkauft</span>}
               {label}
+              {soldOut && <SoldOutTag />}
             </button>
           );
         })}

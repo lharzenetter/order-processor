@@ -1,0 +1,26 @@
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--red);
+  color: var(--white);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.hint {
+  color: var(--gray-dark);
+  font-size: 16px;
+}
