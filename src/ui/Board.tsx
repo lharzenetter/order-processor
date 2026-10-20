@@ -113,23 +113,25 @@ function ActiveRow({
       ) : (
         <span className={styles.all} />
       )}
-      <div className={styles.queue}>
-        {row.queued.length > 0 && <span className={shared.muted}>danach</span>}
-        {row.queued.map((queued) => (
-          <button
-            key={queued.orderId}
-            type="button"
-            className={styles.queueChip}
-            aria-label={`Bestellung Pager ${String(queued.pager)} öffnen`}
-            onClick={() => {
-              onOpenOrder(queued.orderId);
-            }}
-          >
-            {queued.pager}
-            {queued.waiting > 1 && ` ×${String(queued.waiting)}`}
-          </button>
-        ))}
-      </div>
+      {row.queued.length > 0 && (
+        <div className={styles.queue}>
+          <span className={shared.muted}>danach</span>
+          {row.queued.map((queued) => (
+            <button
+              key={queued.orderId}
+              type="button"
+              className={styles.queueChip}
+              aria-label={`Bestellung Pager ${String(queued.pager)} öffnen`}
+              onClick={() => {
+                onOpenOrder(queued.orderId);
+              }}
+            >
+              {queued.pager}
+              {queued.waiting > 1 && ` ×${String(queued.waiting)}`}
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 }
