@@ -10,6 +10,7 @@ import { formatClock } from "./format";
 import { LongPressButton } from "./LongPressButton";
 import { ModalDialog } from "./ModalDialog";
 import shared from "./shared.module.css";
+import { updateRow } from "./update-row";
 import type { Device } from "./use-device";
 import styles from "./Verwaltung.module.css";
 
@@ -49,6 +50,11 @@ export function Verwaltung({
   const [importError, setImportError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const eventCount = meta?.eventCount ?? 0;
+  const versionRow = updateRow(
+    device.updateCheck,
+    device.updateWaiting,
+    device.waitingVersion,
+  );
 
   // The counts the guards name must be current, not as of the last launch or export.
   useEffect(() => {
@@ -191,16 +197,19 @@ export function Verwaltung({
         <h2 className={shared.heading}>Version</h2>
         <div className={shared.row}>
           <span className={shared.grow}>
-            Version {import.meta.env.APP_VERSION} ·{" "}
-            {device.updateWaiting ? "Neue Version bereit" : "Aktuell"}
+            Version {import.meta.env.APP_VERSION} · {versionRow.status}
           </span>
           <button
             type="button"
             className={shared.primary}
-            disabled={!device.updateWaiting}
-            onClick={device.update}
+            disabled={versionRow.disabled}
+            onClick={
+              versionRow.action === "install"
+                ? device.update
+                : device.checkForUpdate
+            }
           >
-            Aktualisieren
+            {versionRow.label}
           </button>
         </div>
       </section>

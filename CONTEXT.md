@@ -16,7 +16,8 @@ Webapp for the kitchen window at the Feuerwehr Kirbe: guests hand in a prepaid m
 - **Back to queue** (on screen: _Zurück in Warteschlange_) — a buzzed plate that can't be handed out (dropped, spoiled, left too long) is taken off the order, which waits for that product again with its FIFO place kept. Formerly called _Discard_; avoid that word.
 - **Missing pager** — a pager number taken out of use because the device is lost, not returned or broken. Not offered at intake until restored.
 - **Sold out** — a product the kitchen has run out of, toggled by staff. Intake warns before entering it; open orders still waiting for it are listed so staff can cancel those plates.
+- **Update** — a newer build of the app. It takes over on the iPad only when staff tap _Aktualisieren_ in the Verwaltung, never on its own.
 
 ## On-screen language
 
-The UI is German only. Domain term → on-screen word: Buzz → _Rufen / gerufen_; Re-buzz → _Nochmal rufen_; Hand on → _Weitergeben_; Back to queue → _Zurück in Warteschlange_; Cancel → _Stornieren_; Handover → _Ausgabe_; Board → _Übersicht_; Meal voucher / plate → _Bon / Teller_; Missing pager → _Pager fehlt_; Sold out → _Ausverkauft markieren_ (header button: _Ausverkauft…_); Undo → _Rückgängig_; Pager return → _Pager N zurücknehmen_; Status screen → _Verwaltung_; All pagers out → _Alle Pager vergeben_.
+The UI is German only. Domain term → on-screen word: Buzz → _Rufen / gerufen_; Re-buzz → _Nochmal rufen_; Hand on → _Weitergeben_; Back to queue → _Zurück in Warteschlange_; Cancel → _Stornieren_; Handover → _Ausgabe_; Board → _Übersicht_; Meal voucher / plate → _Bon / Teller_; Missing pager → _Pager fehlt_; Sold out → _Ausverkauft markieren_ (header button: _Ausverkauft…_); Undo → _Rückgängig_; Pager return → _Pager N zurücknehmen_; Status screen → _Verwaltung_; Update check → _Nach Updates suchen_; Install update → _Aktualisieren_; All pagers out → _Alle Pager vergeben_.

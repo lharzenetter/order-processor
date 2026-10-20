@@ -95,3 +95,17 @@ test("Importieren rejects a file it can't read and keeps the log", async ({
   await verwaltung.getByRole("button", { name: "← Zurück" }).click();
   await expect(page.getByText("1 offen · 29 Pager frei")).toBeVisible();
 });
+
+test("Nach Updates suchen reports when it can't check", async ({ page }) => {
+  // Playwright blocks service workers, so the check runs without one, as on a failed connection.
+  await openApp(page);
+  await page.getByRole("button", { name: "Verwaltung" }).click();
+  const verwaltung = page.getByRole("region", { name: "Verwaltung" });
+  await expect(verwaltung).toContainText("Aktuell");
+
+  await verwaltung.getByRole("button", { name: "Nach Updates suchen" }).click();
+  await expect(verwaltung).toContainText("Keine Verbindung · nicht geprüft");
+  await expect(
+    verwaltung.getByRole("button", { name: "Nach Updates suchen" }),
+  ).toBeEnabled();
+});
