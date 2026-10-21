@@ -9,6 +9,7 @@ import type {
 import { cx } from "./cx";
 import { formatClock, formatSince } from "./format";
 import { handoverConsequence } from "./handover-consequence";
+import { handOverLabel } from "./handover-text";
 import { ModalDialog } from "./ModalDialog";
 import styles from "./OrderDialog.module.css";
 import shared from "./shared.module.css";
@@ -282,7 +283,7 @@ function OrderLines({
               onHandOver(view.orderId, plates);
             }}
           >
-            {total} Teller ausgeben
+            {handOverLabel(plates)}
           </button>
         </div>
       </div>

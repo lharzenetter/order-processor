@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { MENU } from "../core/index";
-import type { State } from "../core/index";
+import type { PlateCount, State } from "../core/index";
 import { cx } from "./cx";
+import { handedOverText } from "./handover-text";
 import { Keypad, PagerDisplay, pressKey } from "./Keypad";
 import { ModalDialog } from "./ModalDialog";
 import shared from "./shared.module.css";
@@ -49,14 +50,18 @@ export function AusgabeDialog({
 /** Stays until OK, so the pager is not forgotten. */
 export function PagerReturnDialog({
   pager,
+  handedOver,
   onOk,
 }: {
   pager: number;
+  /** The plates whose handover completed the order; `null` when a cancel did. */
+  handedOver: readonly PlateCount[] | null;
   onOk: () => void;
 }) {
   return (
     <ModalDialog title={`Pager ${String(pager)} zurücknehmen`} size="big">
       <p className={shared.muted}>
+        {handedOver !== null && <>{handedOverText(handedOver)} </>}
         Bestellung komplett. Der Pager ist wieder frei.
       </p>
       <div className={styles.stack}>

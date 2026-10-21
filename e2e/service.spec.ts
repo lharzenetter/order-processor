@@ -16,17 +16,29 @@ test("take an order, buzz it, hand it over and take the pager back", async ({
     .click();
   await expect(gerufenLine(page, 7, "Braten")).toBeVisible();
 
+  // GitHub issue #2: the row opens the order, so staff see the plates before they go out.
   await gerufenLine(page, 7, "Braten")
-    .getByRole("button", { name: "1 Teller ausgeben" })
+    .getByRole("button", { name: "Ausgeben…" })
     .click();
-  const remaining = page.getByRole("dialog", { name: "Pager 7" });
-  await expect(remaining).toContainText(
-    "Pager 7 bleibt beim Gast — noch offen:",
+  const order = page.getByRole("dialog", { name: "Pager 7" });
+  await expect(
+    order.getByRole("button", { name: "1× Pommes, 1× Braten ausgeben" }),
+  ).toBeVisible();
+  await expect(page.getByText("1 offen · 29 Pager frei")).toBeVisible();
+
+  await order
+    .getByRole("button", { name: "Einen Teller Pommes weniger ausgeben" })
+    .click();
+  await order.getByRole("button", { name: "1× Braten ausgeben" }).click();
+  await expect(order).toContainText(
+    "Ausgegeben: 1× Braten. Pager 7 bleibt beim Gast — noch offen:",
   );
-  await remaining.getByRole("button", { name: "1 Teller ausgeben" }).click();
+  await order.getByRole("button", { name: "1× Pommes ausgeben" }).click();
 
   const pagerBack = page.getByRole("dialog", { name: "Pager 7 zurücknehmen" });
-  await expect(pagerBack).toBeVisible();
+  await expect(pagerBack).toContainText(
+    "Ausgegeben: 1× Pommes. Bestellung komplett.",
+  );
   await pagerBack.getByRole("button", { name: "OK" }).click();
   await expect(page.getByText("0 offen · 30 Pager frei")).toBeVisible();
 });
@@ -49,9 +61,14 @@ test("a partial pickup keeps the pager with the guest", async ({ page }) => {
   await expect(order.getByRole("group", { name: "Braten" })).toContainText(
     "1 gerufen",
   );
-  await order.getByRole("button", { name: "1 Teller ausgeben" }).click();
+  await order.getByRole("button", { name: "1× Braten ausgeben" }).click();
 
-  await expect(order).toContainText("Pager 12 bleibt beim Gast — noch offen:");
+  await expect(order).toContainText(
+    "Ausgegeben: 1× Braten. Pager 12 bleibt beim Gast — noch offen:",
+  );
+  await expect(
+    order.getByRole("button", { name: "Ausgeben", exact: true }),
+  ).toBeDisabled();
   await expect(order.getByRole("group", { name: "Braten" })).toContainText(
     "1 wartet",
   );

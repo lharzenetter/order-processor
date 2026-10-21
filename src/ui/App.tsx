@@ -12,6 +12,7 @@ import { SoldOutBanners, StandaloneBanner } from "./Banners";
 import { Board } from "./Board";
 import { cx } from "./cx";
 import { GerufenColumn } from "./GerufenColumn";
+import { handedOverText } from "./handover-text";
 import { Header } from "./Header";
 import { IntakeDialog } from "./IntakeDialog";
 import { OrderDialog } from "./OrderDialog";
@@ -37,7 +38,11 @@ type Dialog =
       readonly orderId: string;
       readonly note: string | null;
     }
-  | { readonly kind: "pagerReturn"; readonly pager: number };
+  | {
+      readonly kind: "pagerReturn";
+      readonly pager: number;
+      readonly handedOver: readonly PlateCount[] | null;
+    };
 
 export function App() {
   const board = usePagerBoard();
@@ -59,22 +64,23 @@ export function App() {
 
   // After every handover, and after a cancel that empties the order: take the pager back, or
   // show what the guest is still owed. A cancel inside the open popup just leaves it open.
+  // `handedOver` is null for a cancel; for a handover it names the plates, as they leave the popup.
   function afterChange(
     next: State | null,
     orderId: string,
-    after: "handover" | "cancel",
+    handedOver: readonly PlateCount[] | null,
   ): void {
     const view = next === null ? null : orderView(next, orderId, now);
     if (view === null) {
       return;
     }
     if (!view.open) {
-      setDialog({ kind: "pagerReturn", pager: view.pager });
-    } else if (after === "handover") {
+      setDialog({ kind: "pagerReturn", pager: view.pager, handedOver });
+    } else if (handedOver !== null) {
       setDialog({
         kind: "order",
         orderId,
-        note: `Pager ${String(view.pager)} bleibt beim Gast — noch offen:`,
+        note: `${handedOverText(handedOver)} Pager ${String(view.pager)} bleibt beim Gast — noch offen:`,
       });
     }
   }
@@ -90,7 +96,7 @@ export function App() {
     afterChange(
       await run({ type: "platesHandedOver", orderId, plates }),
       orderId,
-      "handover",
+      plates,
     );
   }
 
@@ -217,9 +223,6 @@ export function App() {
           onShowPager={() => {
             setDialog({ kind: "ausgabe" });
           }}
-          onHandOver={(orderId, productId, count) => {
-            void handOver(orderId, [{ productId, count }]);
-          }}
           onRebuzz={(orderId, productId) => {
             void run({ type: "rebuzzed", orderId, productId });
           }}
@@ -286,7 +289,7 @@ export function App() {
               productId,
               count: 1,
             }).then((next) => {
-              afterChange(next, orderId, "cancel");
+              afterChange(next, orderId, null);
             });
           }}
           onAbandon={(orderId, pagerBack) => {
@@ -302,6 +305,7 @@ export function App() {
       {dialog?.kind === "pagerReturn" && (
         <PagerReturnDialog
           pager={dialog.pager}
+          handedOver={dialog.handedOver}
           onOk={() => {
             setDialog(null);
           }}

@@ -13,14 +13,12 @@ export function GerufenColumn({
   state,
   now,
   onShowPager,
-  onHandOver,
   onRebuzz,
   onOpenOrder,
 }: {
   state: State;
   now: number;
   onShowPager: () => void;
-  onHandOver: (orderId: string, productId: string, count: number) => void;
   onRebuzz: (orderId: string, productId: string) => void;
   onOpenOrder: (orderId: string) => void;
 }) {
@@ -53,14 +51,15 @@ export function GerufenColumn({
             </div>
             {line.rebuzzDue && <div className={styles.hint}>{REBUZZ_HINT}</div>}
             <div className={shared.row}>
+              {/* Opens the order rather than handing over, so staff see what goes out first. */}
               <button
                 type="button"
                 className={cx(shared.primary, styles.handOver)}
                 onClick={() => {
-                  onHandOver(line.orderId, line.productId, line.buzzed);
+                  onOpenOrder(line.orderId);
                 }}
               >
-                {line.buzzed} Teller ausgeben
+                Ausgeben…
               </button>
               <button
                 type="button"
@@ -75,15 +74,6 @@ export function GerufenColumn({
                 Nochmal rufen
               </button>
             </div>
-            <button
-              type="button"
-              className={cx(shared.link, styles.more)}
-              onClick={() => {
-                onOpenOrder(line.orderId);
-              }}
-            >
-              Weitere Aktionen…
-            </button>
           </div>
         ))}
       </section>

@@ -11,7 +11,7 @@ Webapp for the kitchen window at the Feuerwehr Kirbe: guests hand in a prepaid m
 - **Pager** — numbered device (1–30). Free, or attached to exactly one open order. Buzzed by hand on the transmitter.
 - **Board** — the one staff view listing all open orders, showing per product which order is next (oldest still waiting for it).
 - **Buzz** — when a plate comes out, window staff press the next order's pager number on the transmitter and mark that plate buzzed. Marking buzzed is what assigns the plate to the order; one plate per mark, or all of a row's remaining plates at once.
-- **Handover** — a guest shows their pager; staff enter its number, see everything for that order, and mark what the guest takes as picked up. An order may have several handovers (partial pickup).
+- **Handover** — a guest shows their pager; staff find the order by its pager number, see everything for that order, and mark what the guest takes as picked up. An order may have several handovers (partial pickup).
 - **Pager return** — at the handover that completes the order, the pager comes back and becomes free.
 - **Back to queue** (on screen: _Zurück in Warteschlange_) — a buzzed plate that can't be handed out (dropped, spoiled, left too long) is taken off the order, which waits for that product again with its FIFO place kept. Formerly called _Discard_; avoid that word.
 - **Missing pager** — a pager number taken out of use because the device is lost, not returned or broken. Not offered at intake until restored.
