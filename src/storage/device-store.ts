@@ -5,14 +5,60 @@ import type { Event } from "../core/index";
 import { isEvent, isRecord } from "./guards";
 
 /**
- * The seam every state change goes through. A future server implements the same interface; core
- * and ui don't change.
+ * The seam every state change goes through: the `DeviceStore` standalone, a `ServerLog` in sync
+ * mode. Core and ui don't change between them.
  */
 export interface EventLog {
   /** All events, in `seq` order. */
   load(): Promise<Event[]>;
-  /** Resolves once the event is durably stored. */
-  append(event: Event): Promise<void>;
+  /** Resolves once the event counts: durably stored, or appended by the server. */
+  append(event: Event): Promise<AppendResult>;
+  /** Changes that didn't come from this iPad's `append`; returns the unsubscribe. */
+  subscribe(listener: (change: LogChange) => void): () => void;
+}
+
+export type AppendResult =
+  | { readonly kind: "appended" }
+  /** Others appended first; `missed` is already in the mirror, from the tap's `seq` on. */
+  | { readonly kind: "stale"; readonly missed: readonly Event[] }
+  /** The log was replaced or the iPad disconnected before the tap counted. */
+  | { readonly kind: "dropped" };
+
+export type ReplaceReason = "push" | "newFest" | "import" | "overwrite";
+
+export type LogChange =
+  | { readonly kind: "appended"; readonly events: readonly Event[] }
+  | {
+      /** The hook reloads. */
+      readonly kind: "replaced";
+      /** Set when another iPad replaced the log; drives the follow toast. */
+      readonly by?: {
+        readonly device: string;
+        readonly reason: Exclude<ReplaceReason, "push">;
+      };
+    }
+  | {
+      readonly kind: "connection";
+      /** `connecting` whenever an attempt starts; the hook keeps a blocked strip through backoff. */
+      readonly connection: "connecting" | "connected" | "disconnected";
+    }
+  | { readonly kind: "rejected"; readonly reason: "pairingCode" | "version" }
+  | { readonly kind: "decide"; readonly question: DecideQuestion };
+
+export type DecideQuestion =
+  | { readonly kind: "serverEmpty"; readonly localCount: number }
+  | {
+      readonly kind: "diverged";
+      readonly localCount: number;
+      readonly serverCount: number;
+    };
+
+/** What the Verwaltung's Server section saves; kept in `meta`, never in the log or an export. */
+export interface SyncSettings {
+  /** A host name with an optional `:port`; `https://` is implied. */
+  readonly serverAddress: string;
+  readonly pairingCode: string;
+  readonly deviceName: string;
 }
 
 /** Raise on any change to the stored or exported shape this build cannot read back. */
@@ -28,6 +74,14 @@ export interface Meta {
   readonly lastExportAt?: number;
   /** The result of `navigator.storage.persist()`. */
   readonly persisted?: boolean;
+  /** Set only in sync mode; an empty address means standalone. */
+  readonly serverAddress?: string;
+  readonly pairingCode?: string;
+  readonly deviceName?: string;
+  /** The server log the mirror belongs to. */
+  readonly logId?: string;
+  /** The highest `seq` the mirror knows the server has. */
+  readonly serverSeq?: number;
 }
 
 /** The JSON an export writes and an import reads. */
@@ -47,8 +101,22 @@ export interface DeviceStore extends EventLog {
   recordPersisted(persisted: boolean): Promise<void>;
   /** Replaces the whole log. Throws `ImportRejectedError` and changes nothing if the file is unusable. */
   importFile(file: unknown): Promise<void>;
-  /** Neues Fest starten: empties the log and resets meta, keeping the format version. */
+  /**
+   * Neues Fest starten standalone: empties the log and resets meta, keeping the format version
+   * and the connection settings.
+   */
   clear(): Promise<void>;
+  /** The one replacement: `logId` is the server log's in sync mode, `null` standalone. */
+  replaceLog(events: readonly Event[], logId: string | null): Promise<void>;
+  /** Mirrors events the server has appended, with the log they belong to. */
+  recordFromServer(
+    events: readonly Event[],
+    logId: string,
+    serverSeq: number,
+  ): Promise<void>;
+  saveSettings(settings: SyncSettings): Promise<void>;
+  /** Trennen: the mirror, its log and the other settings stay for reconnecting. */
+  clearServerAddress(): Promise<void>;
   close(): void;
 }
 
@@ -64,10 +132,18 @@ export class ImportRejectedError extends Error {
 interface Schema extends DBSchema {
   events: { key: number; value: unknown };
   meta: {
-    key: "formatVersion" | "lastExportAt" | "persisted";
+    key: MetaKey;
     value: unknown;
   };
 }
+
+type MetaKey =
+  | "formatVersion"
+  | "lastExportAt"
+  | "persisted"
+  | keyof SyncSettings
+  | "logId"
+  | "serverSeq";
 
 type Database = IDBPDatabase<Schema>;
 
@@ -133,22 +209,46 @@ function deviceStore(db: Database): DeviceStore {
     async append(event) {
       const tx = db.transaction("events", "readwrite", STRICT);
       await Promise.all([tx.store.add(event), tx.done]);
+      return { kind: "appended" };
+    },
+    subscribe() {
+      // Standalone, nothing changes the log but this iPad's own appends.
+      return () => undefined;
     },
     async meta() {
       const tx = db.transaction(["events", "meta"], "readonly");
       const meta = tx.objectStore("meta");
-      const [formatVersion, eventCount, lastExportAt, persisted] =
-        await Promise.all([
-          meta.get("formatVersion"),
-          tx.objectStore("events").count(),
-          meta.get("lastExportAt"),
-          meta.get("persisted"),
-        ]);
+      const [
+        formatVersion,
+        eventCount,
+        lastExportAt,
+        persisted,
+        serverAddress,
+        pairingCode,
+        deviceName,
+        logId,
+        serverSeq,
+      ] = await Promise.all([
+        meta.get("formatVersion"),
+        tx.objectStore("events").count(),
+        meta.get("lastExportAt"),
+        meta.get("persisted"),
+        meta.get("serverAddress"),
+        meta.get("pairingCode"),
+        meta.get("deviceName"),
+        meta.get("logId"),
+        meta.get("serverSeq"),
+      ]);
       return {
         formatVersion,
         eventCount,
         ...(typeof lastExportAt === "number" ? { lastExportAt } : {}),
         ...(typeof persisted === "boolean" ? { persisted } : {}),
+        ...(typeof serverAddress === "string" ? { serverAddress } : {}),
+        ...(typeof pairingCode === "string" ? { pairingCode } : {}),
+        ...(typeof deviceName === "string" ? { deviceName } : {}),
+        ...(typeof logId === "string" ? { logId } : {}),
+        ...(typeof serverSeq === "number" ? { serverSeq } : {}),
       };
     },
     async exportFile(at) {
@@ -166,25 +266,56 @@ function deviceStore(db: Database): DeviceStore {
       await db.put("meta", persisted, "persisted");
     },
     async importFile(file) {
-      const events = readableEvents(file);
-      const tx = db.transaction(["events", "meta"], "readwrite", STRICT);
-      const eventStore = tx.objectStore("events");
+      await this.replaceLog(readImportFile(file), null);
+    },
+    async clear() {
+      await this.replaceLog([], null);
+      const tx = db.transaction("meta", "readwrite", STRICT);
       await Promise.all([
-        eventStore.clear(),
-        ...events.map((event) => eventStore.add(event)),
-        tx.objectStore("meta").put(FORMAT_VERSION, "formatVersion"),
+        tx.store.delete("lastExportAt"),
+        tx.store.delete("persisted"),
         tx.done,
       ]);
     },
-    async clear() {
+    async replaceLog(events, logId) {
       const tx = db.transaction(["events", "meta"], "readwrite", STRICT);
+      const eventStore = tx.objectStore("events");
       const meta = tx.objectStore("meta");
       await Promise.all([
-        tx.objectStore("events").clear(),
-        meta.clear(),
+        eventStore.clear(),
+        ...events.map((event) => eventStore.add(event)),
         meta.put(FORMAT_VERSION, "formatVersion"),
+        ...(logId === null
+          ? [meta.delete("logId"), meta.delete("serverSeq")]
+          : [
+              meta.put(logId, "logId"),
+              meta.put(events.at(-1)?.seq ?? 0, "serverSeq"),
+            ]),
         tx.done,
       ]);
+    },
+    async recordFromServer(events, logId, serverSeq) {
+      const tx = db.transaction(["events", "meta"], "readwrite", STRICT);
+      const eventStore = tx.objectStore("events");
+      const meta = tx.objectStore("meta");
+      await Promise.all([
+        ...events.map((event) => eventStore.add(event)),
+        meta.put(logId, "logId"),
+        meta.put(serverSeq, "serverSeq"),
+        tx.done,
+      ]);
+    },
+    async saveSettings(settings) {
+      const tx = db.transaction("meta", "readwrite", STRICT);
+      await Promise.all([
+        tx.store.put(settings.serverAddress, "serverAddress"),
+        tx.store.put(settings.pairingCode, "pairingCode"),
+        tx.store.put(settings.deviceName, "deviceName"),
+        tx.done,
+      ]);
+    },
+    async clearServerAddress() {
+      await db.delete("meta", "serverAddress");
     },
     close() {
       db.close();
@@ -192,8 +323,11 @@ function deviceStore(db: Database): DeviceStore {
   };
 }
 
-// The same rule as at launch: a file this build can't read never replaces the log.
-function readableEvents(file: unknown): readonly Event[] {
+/**
+ * The events of an export file, checked by the same rule as at launch: a file this build can't
+ * read never replaces the log. Throws `ImportRejectedError`.
+ */
+export function readImportFile(file: unknown): readonly Event[] {
   if (
     !isRecord(file) ||
     file.app !== "kirbe-pager" ||
@@ -206,7 +340,11 @@ function readableEvents(file: unknown): readonly Event[] {
       `Format ${String(file.formatVersion)} kann diese Version nicht lesen`,
     );
   }
-  const events: readonly unknown[] = file.events;
+  return readableEvents(file.events);
+}
+
+/** Checks events about to replace a log; throws `ImportRejectedError`. */
+export function readableEvents(events: readonly unknown[]): readonly Event[] {
   const valid = events.filter(isEvent).sort((a, b) => a.seq - b.seq);
   if (
     valid.length !== events.length ||

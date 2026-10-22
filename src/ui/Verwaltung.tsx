@@ -3,22 +3,27 @@ import type { ReactNode } from "react";
 import { evaluationRows, headerCounts, openOrdersList } from "../core/index";
 import type { State } from "../core/index";
 import { ImportRejectedError } from "../storage/index";
-import type { DeviceStore, Meta } from "../storage/index";
+import type { ReplaceResult } from "../storage/index";
 import { cx } from "./cx";
 import { exportLog, readExportFile } from "./export-log";
 import { formatClock } from "./format";
 import { LongPressButton } from "./LongPressButton";
 import { ModalDialog } from "./ModalDialog";
+import { ServerSection } from "./ServerSection";
 import shared from "./shared.module.css";
 import { updateRow } from "./update-row";
 import type { Device } from "./use-device";
+import type { PagerBoard } from "./use-pager-board";
 import styles from "./Verwaltung.module.css";
 
 type View = "main" | "auswertung" | "offen";
 
 type Guard =
   | { readonly kind: "import"; readonly file: unknown }
-  | { readonly kind: "clear" };
+  | { readonly kind: "clear" }
+  | { readonly kind: "overwrite" };
+
+const REPLACED_MEANWHILE = "Das Protokoll wurde inzwischen ersetzt";
 
 /**
  * The Verwaltung overlay. Opening it is harmless; the guards sit on the dangerous actions. In
@@ -26,25 +31,22 @@ type Guard =
  */
 export function Verwaltung({
   mode,
-  state,
-  meta,
-  store,
+  board,
   device,
   onBack,
-  onReload,
-  onRefreshMeta,
   showToast,
 }: {
   mode: "full" | "recovery";
-  state: State;
-  meta: Meta | null;
-  store: DeviceStore;
+  board: PagerBoard;
   device: Device;
   onBack?: () => void;
-  onReload: () => Promise<void>;
-  onRefreshMeta: () => Promise<void>;
   showToast: (text: string) => void;
 }) {
+  const { state, meta, store, connection } = board;
+  const onRefreshMeta = board.refreshMeta;
+  const synced = connection !== "standalone";
+  // In sync mode the replacements act on the server, so they need a working connection.
+  const replaceEnabled = board.actionsEnabled;
   const [view, setView] = useState<View>("main");
   const [guard, setGuard] = useState<Guard | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -62,6 +64,9 @@ export function Verwaltung({
   }, [onRefreshMeta, guard]);
 
   async function runExport(): Promise<boolean> {
+    if (store === null) {
+      return false;
+    }
     try {
       const done = await exportLog(store);
       await onRefreshMeta();
@@ -76,8 +81,9 @@ export function Verwaltung({
     if (exportFirst && !(await runExport())) {
       return;
     }
+    let result: ReplaceResult;
     try {
-      await store.importFile(file);
+      result = await board.importLog(file);
     } catch (error) {
       setImportError(
         error instanceof ImportRejectedError
@@ -87,18 +93,29 @@ export function Verwaltung({
       return;
     }
     setGuard(null);
-    await onReload();
-    showToast("Import abgeschlossen");
+    showToast(
+      result.kind === "replaced" ? "Import abgeschlossen" : REPLACED_MEANWHILE,
+    );
+  }
+
+  async function runReplace(
+    replace: () => Promise<ReplaceResult>,
+    done: string,
+  ): Promise<void> {
+    setGuard(null);
+    try {
+      const result = await replace();
+      showToast(result.kind === "replaced" ? done : REPLACED_MEANWHILE);
+    } catch (error) {
+      showToast(`Fehler: ${String(error)}`);
+    }
   }
 
   async function runClear(exportFirst: boolean): Promise<void> {
     if (exportFirst && !(await runExport())) {
       return;
     }
-    await store.clear();
-    setGuard(null);
-    await onReload();
-    showToast("Neues Fest gestartet");
+    await runReplace(board.startNewFest, "Neues Fest gestartet");
   }
 
   if (view !== "main") {
@@ -127,6 +144,16 @@ export function Verwaltung({
           einem Update wieder importieren.
         </p>
       )}
+      {mode === "full" && (
+        <ServerSection
+          board={board}
+          now={board.now}
+          showToast={showToast}
+          onOverwrite={() => {
+            setGuard({ kind: "overwrite" });
+          }}
+        />
+      )}
       <section className={styles.section}>
         <h2 className={shared.heading}>Aktionen</h2>
         <div className={styles.actions}>
@@ -147,6 +174,7 @@ export function Verwaltung({
           </button>
           <button
             type="button"
+            disabled={!replaceEnabled}
             onClick={() => {
               fileInput.current?.click();
             }}
@@ -235,12 +263,14 @@ export function Verwaltung({
         <section className={cx(styles.section, styles.danger)}>
           <h2 className={shared.heading}>Neues Fest starten</h2>
           <p className={shared.muted}>
-            Leert das Protokoll, z. B. nach Testläufen. Rückgängig kann das
-            nicht zurückholen.
+            {synced
+              ? "Leert das Protokoll auf dem Server, alle iPads folgen. Der Server legt das alte Protokoll im Archiv ab."
+              : "Leert das Protokoll, z. B. nach Testläufen. Rückgängig kann das nicht zurückholen."}
           </p>
           <button
             type="button"
             className={shared.danger}
+            disabled={!replaceEnabled}
             onClick={() => {
               setGuard({ kind: "clear" });
             }}
@@ -258,7 +288,9 @@ export function Verwaltung({
           }}
         >
           <p>
-            Ersetzt {eventCount} Ereignisse auf diesem Gerät durch die Datei.
+            {synced
+              ? `Ersetzt das Protokoll auf dem Server durch die Datei, alle iPads folgen. Dieses iPad hat ${String(eventCount)} Ereignisse.`
+              : `Ersetzt ${String(eventCount)} Ereignisse auf diesem Gerät durch die Datei.`}
           </p>
           {importError !== null && (
             <p className={styles.error} role="alert">
@@ -321,6 +353,37 @@ export function Verwaltung({
               }}
             >
               Ohne Export leeren
+            </LongPressButton>
+            <button
+              type="button"
+              onClick={() => {
+                setGuard(null);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </ModalDialog>
+      )}
+      {guard?.kind === "overwrite" && (
+        <ModalDialog
+          title="Server überschreiben"
+          onClose={() => {
+            setGuard(null);
+          }}
+        >
+          <p>
+            Ersetzt die {meta?.serverSeq ?? 0} Ereignisse auf dem Server durch
+            die {eventCount} Ereignisse dieses iPads. Der Server legt sein altes
+            Protokoll im Archiv ab, alle iPads folgen.
+          </p>
+          <div className={styles.stack}>
+            <LongPressButton
+              onLongPress={() => {
+                void runReplace(board.overwriteServer, "Server überschrieben");
+              }}
+            >
+              Server überschreiben
             </LongPressButton>
             <button
               type="button"

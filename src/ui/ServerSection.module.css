@@ -1,0 +1,65 @@
+.section {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gray-light);
+  background: var(--white);
+}
+
+.status {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.warning {
+  padding: 8px 12px;
+  background: var(--dark-red);
+  color: var(--white);
+  font-weight: 700;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 16px;
+}
+
+.field input {
+  min-height: 52px;
+  padding: 0 10px;
+  border: 2px solid var(--navy);
+  font-size: 20px;
+  user-select: text;
+}
+
+.field input:read-only {
+  border-color: var(--gray-light);
+  background: var(--gray-light);
+}
+
+.problem {
+  color: var(--dark-red);
+  font-weight: 700;
+}
+
+.buttons {
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.buttons > button:not(:last-child),
+.buttons > button:only-child {
+  min-width: 200px;
+  min-height: 64px;
+  font-size: 20px;
+}
+
+.result {
+  font-weight: 700;
+}

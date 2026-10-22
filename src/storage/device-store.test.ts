@@ -200,6 +200,19 @@ describe("export and import", () => {
     expect(await store.load()).toEqual([event(1)]);
   });
 
+  // server-sync 03: builds before and after sync read each other's logs
+  it("imports events that carry the iPad's device name", async () => {
+    const store = await readyStore();
+    const file = {
+      app: "kirbe-pager",
+      formatVersion: FORMAT_VERSION,
+      exportedAt: 1,
+      events: [event(1, { device: "Annahme" }), { ...event(2), future: 1 }],
+    };
+    await store.importFile(file);
+    expect((await store.load())[0]?.device).toBe("Annahme");
+  });
+
   it.each<[string, unknown]>([
     ["not an export", { hello: "world" }],
     [
@@ -208,6 +221,14 @@ describe("export and import", () => {
         app: "kirbe-pager",
         formatVersion: FORMAT_VERSION,
         events: [{ seq: 1, id: "a", at: 1, type: "beerPoured" }],
+      },
+    ],
+    [
+      "an event whose device is not a name",
+      {
+        app: "kirbe-pager",
+        formatVersion: FORMAT_VERSION,
+        events: [{ ...event(1), device: 2 }],
       },
     ],
     [
@@ -257,6 +278,88 @@ describe("Neues Fest starten", () => {
     expect(await reopened.meta()).toEqual({
       formatVersion: FORMAT_VERSION,
       eventCount: 0,
+    });
+  });
+});
+
+describe("the mirror and the server settings", () => {
+  const settings = {
+    serverAddress: "kirbe.example.de",
+    pairingCode: "ABCD2345",
+    deviceName: "Annahme",
+  };
+
+  it("appends standalone and never reports a change", async () => {
+    const store = await readyStore();
+    const changes: unknown[] = [];
+    store.subscribe((change) => changes.push(change));
+    expect(await store.append(event(1))).toEqual({ kind: "appended" });
+    expect(changes).toEqual([]);
+  });
+
+  it("keeps the settings in meta, outside the event log and the export", async () => {
+    const name = freshName();
+    const store = await readyStore(name);
+    await store.saveSettings(settings);
+    store.close();
+    const reopened = await readyStore(name);
+    expect(await reopened.meta()).toMatchObject(settings);
+    expect(await reopened.load()).toEqual([]);
+    expect(Object.keys(await reopened.exportFile(1))).toEqual([
+      "app",
+      "formatVersion",
+      "exportedAt",
+      "events",
+    ]);
+  });
+
+  // server-sync 03: Trennen clears only the address
+  it("forgets only the address on Trennen", async () => {
+    const store = await readyStore();
+    await store.saveSettings(settings);
+    await store.recordFromServer([event(1)], "log-1", 1);
+    await store.clearServerAddress();
+    const meta = await store.meta();
+    expect(meta.serverAddress).toBeUndefined();
+    expect(meta).toMatchObject({
+      pairingCode: "ABCD2345",
+      deviceName: "Annahme",
+      logId: "log-1",
+      serverSeq: 1,
+    });
+  });
+
+  it("records events from the server with the log and the server's seq", async () => {
+    const store = await readyStore();
+    await store.recordFromServer([event(1), event(2)], "log-1", 2);
+    await store.recordFromServer([], "log-1", 2);
+    expect((await store.load()).map((e) => e.seq)).toEqual([1, 2]);
+    expect(await store.meta()).toMatchObject({ logId: "log-1", serverSeq: 2 });
+  });
+
+  it("replaces the log with a server's, or with a standalone one", async () => {
+    const store = await readyStore();
+    await store.append(event(1));
+    await store.replaceLog([event(1, { id: "s" }), event(2)], "log-2");
+    expect((await store.load()).map((e) => e.id)).toEqual(["s", "id-2"]);
+    expect(await store.meta()).toMatchObject({ logId: "log-2", serverSeq: 2 });
+
+    await store.replaceLog([], null);
+    const meta = await store.meta();
+    expect(meta.logId).toBeUndefined();
+    expect(meta.serverSeq).toBeUndefined();
+  });
+
+  it("keeps the connection settings on Neues Fest starten", async () => {
+    const store = await readyStore();
+    await store.saveSettings(settings);
+    await store.recordFromServer([event(1)], "log-1", 1);
+    await store.recordExport(5);
+    await store.clear();
+    expect(await store.meta()).toEqual({
+      formatVersion: FORMAT_VERSION,
+      eventCount: 0,
+      ...settings,
     });
   });
 });

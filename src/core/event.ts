@@ -6,6 +6,8 @@ export interface Stamp {
   readonly seq: number;
   /** Wall-clock milliseconds. */
   readonly at: number;
+  /** The device name of the iPad that tapped, in sync mode; captured at the tap. */
+  readonly device?: string;
 }
 
 export interface PlateCount {

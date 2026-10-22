@@ -38,6 +38,7 @@ export function isEvent(value: unknown): value is Event {
     typeof value.id !== "string" ||
     !Number.isInteger(value.seq) ||
     typeof value.at !== "number" ||
+    (value.device !== undefined && typeof value.device !== "string") ||
     !isEventType(value.type)
   ) {
     return false;

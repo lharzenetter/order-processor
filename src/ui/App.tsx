@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   handOnTarget,
   labelOf,
@@ -8,8 +8,9 @@ import {
 } from "../core/index";
 import type { EventBody, PlateCount, State } from "../core/index";
 import styles from "./App.module.css";
-import { SoldOutBanners, StandaloneBanner } from "./Banners";
+import { SoldOutBanners, StandaloneBanner, SyncStrip } from "./Banners";
 import { Board } from "./Board";
+import { connectionLabel } from "./connection";
 import { cx } from "./cx";
 import { GerufenColumn } from "./GerufenColumn";
 import { handedOverText } from "./handover-text";
@@ -24,6 +25,7 @@ import {
   SoldOutDialog,
 } from "./SmallDialogs";
 import { StepHeading } from "./StepHeading";
+import { DecideDialog } from "./SyncDialogs";
 import { Toasts, useToasts } from "./Toasts";
 import { useDevice } from "./use-device";
 import { usePagerBoard } from "./use-pager-board";
@@ -45,15 +47,48 @@ type Dialog =
     };
 
 export function App() {
-  const board = usePagerBoard();
-  const device = useDevice();
   const { toasts, showToast } = useToasts();
+  const board = usePagerBoard(showToast);
+  const device = useDevice();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [verwaltungOpen, setVerwaltungOpen] = useState(false);
-  const { state, now, status, store } = board;
+  const { state, now, status, store, connection, decide, pending } = board;
+  const tappedRef = useRef<HTMLButtonElement | null>(null);
+  // In sync mode the board stays readable but takes no taps until the server counts them.
+  const locked =
+    decide !== null ||
+    connection === "connecting" ||
+    connection === "disconnected" ||
+    connection === "rejected";
+
+  useEffect(() => {
+    function remember(event: PointerEvent): void {
+      tappedRef.current =
+        event.target instanceof Element ? event.target.closest("button") : null;
+    }
+    document.addEventListener("pointerdown", remember, true);
+    return () => {
+      document.removeEventListener("pointerdown", remember, true);
+    };
+  }, []);
+
+  // The spinner sits on the tapped button itself; global.css shows it only after 300 ms.
+  useEffect(() => {
+    const button = tappedRef.current;
+    if (!pending || button === null) {
+      return;
+    }
+    button.dataset.pending = "";
+    return () => {
+      delete button.dataset.pending;
+    };
+  }, [pending]);
 
   // Every action goes through the log; a refused event is a bug, shown rather than swallowed.
   async function run(body: EventBody): Promise<State | null> {
+    if (!board.actionsEnabled) {
+      return null;
+    }
     try {
       return await board.dispatch(body);
     } catch (error) {
@@ -146,12 +181,8 @@ export function App() {
       <>
         <Verwaltung
           mode="recovery"
-          state={state}
-          meta={board.meta}
-          store={store}
+          board={board}
           device={device}
-          onReload={board.reload}
-          onRefreshMeta={board.refreshMeta}
           showToast={showToast}
         />
         <Toasts toasts={toasts} />
@@ -166,6 +197,12 @@ export function App() {
       {!device.standalone && <StandaloneBanner />}
       <Header
         state={state}
+        connectionStatus={connectionLabel(
+          connection,
+          board.rejectedReason,
+          board.meta?.deviceName ?? "",
+        )}
+        actionsEnabled={board.actionsEnabled}
         onSoldOut={() => {
           setDialog({ kind: "soldOut" });
         }}
@@ -185,158 +222,197 @@ export function App() {
           setVerwaltungOpen(true);
         }}
       />
-      <SoldOutBanners state={state} onOpenOrder={openOrder} />
-      <div className={styles.shell}>
-        <section className={styles.intake} aria-labelledby="step-annehmen">
-          <StepHeading id="step-annehmen" step="1" title="Annehmen" />
-          <button
-            type="button"
-            className={cx(shared.primary, styles.newOrder)}
-            disabled={allOut}
-            onClick={() => {
-              setDialog({ kind: "intake" });
+      <SyncStrip
+        connection={connection}
+        rejectedReason={board.rejectedReason}
+        since={board.blockedSince}
+        onVerwaltung={() => {
+          setVerwaltungOpen(true);
+        }}
+      />
+      <div
+        className={cx(styles.board, locked && styles.locked)}
+        inert={locked || pending}
+        data-testid="board"
+      >
+        <SoldOutBanners state={state} onOpenOrder={openOrder} />
+        <div className={styles.shell}>
+          <section className={styles.intake} aria-labelledby="step-annehmen">
+            <StepHeading id="step-annehmen" step="1" title="Annehmen" />
+            <button
+              type="button"
+              className={cx(shared.primary, styles.newOrder)}
+              disabled={allOut}
+              onClick={() => {
+                setDialog({ kind: "intake" });
+              }}
+            >
+              {allOut ? (
+                "Alle Pager vergeben"
+              ) : (
+                <>
+                  <span className={styles.plus}>+</span> Neue Bestellung
+                  <small>{free.length} Pager frei</small>
+                </>
+              )}
+            </button>
+            <p className={cx(shared.muted, styles.intakeHint)}>
+              Bon abtippen, Pager vom Stapel nehmen, Nummer antippen.
+            </p>
+          </section>
+          <Board
+            state={state}
+            onBuzz={(orderId, productId, count) => {
+              void run({ type: "platesBuzzed", orderId, productId, count });
             }}
-          >
-            {allOut ? (
-              "Alle Pager vergeben"
-            ) : (
-              <>
-                <span className={styles.plus}>+</span> Neue Bestellung
-                <small>{free.length} Pager frei</small>
-              </>
-            )}
-          </button>
-          <p className={cx(shared.muted, styles.intakeHint)}>
-            Bon abtippen, Pager vom Stapel nehmen, Nummer antippen.
-          </p>
-        </section>
-        <Board
-          state={state}
-          onBuzz={(orderId, productId, count) => {
-            void run({ type: "platesBuzzed", orderId, productId, count });
-          }}
-          onOpenOrder={openOrder}
-        />
-        <GerufenColumn
-          state={state}
-          now={now}
-          onShowPager={() => {
-            setDialog({ kind: "ausgabe" });
-          }}
-          onRebuzz={(orderId, productId) => {
-            void run({ type: "rebuzzed", orderId, productId });
-          }}
-          onOpenOrder={openOrder}
-        />
+            onOpenOrder={openOrder}
+          />
+          <GerufenColumn
+            state={state}
+            now={now}
+            onShowPager={() => {
+              setDialog({ kind: "ausgabe" });
+            }}
+            onRebuzz={(orderId, productId) => {
+              void run({ type: "rebuzzed", orderId, productId });
+            }}
+            onOpenOrder={openOrder}
+          />
+        </div>
       </div>
 
-      {dialog?.kind === "intake" && (
-        <IntakeDialog
-          state={state}
-          onClose={() => {
-            setDialog(null);
-          }}
-          onTakeOrder={(pager, plates) => {
-            void run({ type: "orderTaken", pager, plates }).then((next) => {
-              if (next !== null) {
-                setDialog(null);
-                showToast(`Bestellung auf Pager ${String(pager)}`);
+      {decide !== null && (
+        <DecideDialog
+          question={decide}
+          store={store}
+          onPush={() => {
+            void board.pushLocal().then((result) => {
+              if (result.kind === "conflict") {
+                showToast("Das Protokoll wurde inzwischen ersetzt");
               }
             });
           }}
-          onMarkMissing={(pager) => {
-            void run({ type: "pagerMarkedMissing", pager });
+          onAdopt={() => {
+            void board.adoptServer();
           }}
-          onRestore={(pager) => {
-            void run({ type: "pagerRestored", pager });
-          }}
-        />
-      )}
-      {dialog?.kind === "ausgabe" && (
-        <AusgabeDialog
-          onClose={() => {
-            setDialog(null);
-          }}
-          onShow={(digits) => {
-            const pager = Number(digits);
-            const order = openOrderByPager(state, pager);
-            if (order === null) {
-              setDialog(null);
-              showToast(`Keine offene Bestellung auf Pager ${String(pager)}`);
-            } else {
-              openOrder(order.id);
-            }
-          }}
-        />
-      )}
-      {dialog?.kind === "order" && (
-        <OrderDialog
-          key={`${dialog.orderId}/${dialog.note ?? ""}`}
-          state={state}
-          now={now}
-          orderId={dialog.orderId}
-          note={dialog.note}
-          onClose={() => {
-            setDialog(null);
-          }}
-          onHandOver={(orderId, plates) => {
-            void handOver(orderId, plates);
-          }}
-          onCancelPlate={(orderId, productId) => {
-            void run({
-              type: "platesCancelled",
-              orderId,
-              productId,
-              count: 1,
-            }).then((next) => {
-              afterChange(next, orderId, null);
+          onCancel={() => {
+            void board.disconnect().then(() => {
+              showToast("Nicht verbunden — dieses iPad bleibt eigenständig");
             });
           }}
-          onAbandon={(orderId, pagerBack) => {
-            void run({ type: "orderAbandoned", orderId, pagerBack }).then(
-              () => {
+        />
+      )}
+      {/* All taps are inert while a tap is on its way, the dialogs' included. A dialog opened
+          before the board locked would take taps that can't count, so it is set aside until the board unlocks. */}
+      {!locked && (
+        <div className={styles.dialogs} inert={pending}>
+          {dialog?.kind === "intake" && (
+            <IntakeDialog
+              state={state}
+              onClose={() => {
                 setDialog(null);
-              },
-            );
-          }}
-          actions={lineActions}
-        />
-      )}
-      {dialog?.kind === "pagerReturn" && (
-        <PagerReturnDialog
-          pager={dialog.pager}
-          handedOver={dialog.handedOver}
-          onOk={() => {
-            setDialog(null);
-          }}
-        />
-      )}
-      {dialog?.kind === "soldOut" && (
-        <SoldOutDialog
-          state={state}
-          onToggle={(productId, soldOut) => {
-            void run({
-              type: soldOut ? "soldOutMarked" : "soldOutCleared",
-              productId,
-            });
-          }}
-          onClose={() => {
-            setDialog(null);
-          }}
-        />
+              }}
+              onTakeOrder={(pager, plates) => {
+                void run({ type: "orderTaken", pager, plates }).then((next) => {
+                  if (next !== null) {
+                    setDialog(null);
+                    showToast(`Bestellung auf Pager ${String(pager)}`);
+                  }
+                });
+              }}
+              onMarkMissing={(pager) => {
+                void run({ type: "pagerMarkedMissing", pager });
+              }}
+              onRestore={(pager) => {
+                void run({ type: "pagerRestored", pager });
+              }}
+            />
+          )}
+          {dialog?.kind === "ausgabe" && (
+            <AusgabeDialog
+              onClose={() => {
+                setDialog(null);
+              }}
+              onShow={(digits) => {
+                const pager = Number(digits);
+                const order = openOrderByPager(state, pager);
+                if (order === null) {
+                  setDialog(null);
+                  showToast(
+                    `Keine offene Bestellung auf Pager ${String(pager)}`,
+                  );
+                } else {
+                  openOrder(order.id);
+                }
+              }}
+            />
+          )}
+          {dialog?.kind === "order" && (
+            <OrderDialog
+              key={`${dialog.orderId}/${dialog.note ?? ""}`}
+              state={state}
+              now={now}
+              orderId={dialog.orderId}
+              note={dialog.note}
+              onClose={() => {
+                setDialog(null);
+              }}
+              onHandOver={(orderId, plates) => {
+                void handOver(orderId, plates);
+              }}
+              onCancelPlate={(orderId, productId) => {
+                void run({
+                  type: "platesCancelled",
+                  orderId,
+                  productId,
+                  count: 1,
+                }).then((next) => {
+                  afterChange(next, orderId, null);
+                });
+              }}
+              onAbandon={(orderId, pagerBack) => {
+                void run({ type: "orderAbandoned", orderId, pagerBack }).then(
+                  () => {
+                    setDialog(null);
+                  },
+                );
+              }}
+              actions={lineActions}
+            />
+          )}
+          {dialog?.kind === "pagerReturn" && (
+            <PagerReturnDialog
+              pager={dialog.pager}
+              handedOver={dialog.handedOver}
+              onOk={() => {
+                setDialog(null);
+              }}
+            />
+          )}
+          {dialog?.kind === "soldOut" && (
+            <SoldOutDialog
+              state={state}
+              onToggle={(productId, soldOut) => {
+                void run({
+                  type: soldOut ? "soldOutMarked" : "soldOutCleared",
+                  productId,
+                });
+              }}
+              onClose={() => {
+                setDialog(null);
+              }}
+            />
+          )}
+        </div>
       )}
       {verwaltungOpen && (
         <Verwaltung
           mode="full"
-          state={state}
-          meta={board.meta}
-          store={store}
+          board={board}
           device={device}
           onBack={() => {
             setVerwaltungOpen(false);
           }}
-          onReload={board.reload}
-          onRefreshMeta={board.refreshMeta}
           showToast={showToast}
         />
       )}

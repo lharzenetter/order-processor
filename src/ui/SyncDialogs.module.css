@@ -1,0 +1,11 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.stack button {
+  min-height: 64px;
+  font-size: 20px;
+}

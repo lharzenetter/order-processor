@@ -55,7 +55,12 @@ export function undoTarget(
   state: State,
 ): { readonly event: Event; readonly label: string } | null {
   const event = state.live.at(-1);
-  return event === undefined
-    ? null
-    : { event, label: describeEvent(event, state) };
+  if (event === undefined) {
+    return null;
+  }
+  const label = describeEvent(event, state);
+  return {
+    event,
+    label: event.device === undefined ? label : `${label} (${event.device})`,
+  };
 }

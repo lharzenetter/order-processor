@@ -12,14 +12,21 @@ export interface TestLog {
 
 export const START_AT = 1_760_000_000_000;
 
-export function testLog(): TestLog {
+/** `device` is stamped on every event, as an iPad in sync mode does. */
+export function testLog(options: { readonly device?: string } = {}): TestLog {
   const events: Event[] = [];
   let now = START_AT;
   return {
     events,
     add(body) {
       const seq = events.length + 1;
-      const event: Event = { ...body, id: `e${String(seq)}`, seq, at: now };
+      const event: Event = {
+        ...body,
+        id: `e${String(seq)}`,
+        seq,
+        at: now,
+        ...(options.device === undefined ? {} : { device: options.device }),
+      };
       events.push(event);
       return event;
     },

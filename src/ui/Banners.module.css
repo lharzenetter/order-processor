@@ -27,3 +27,36 @@
   color: var(--dark-red);
   font-weight: 700;
 }
+
+/* Styled like the standalone banner; the board under it is locked. */
+.sync {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px 10px 24px;
+  background: var(--dark-red);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.syncText {
+  flex: 1;
+}
+
+.syncText small {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.syncButton {
+  min-height: 52px;
+  padding: 0 18px;
+  border: 2px solid var(--white);
+  background: transparent;
+  color: var(--white);
+  font-size: 18px;
+  font-weight: 700;
+}

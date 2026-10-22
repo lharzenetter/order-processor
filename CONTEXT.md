@@ -16,8 +16,19 @@ Webapp for the kitchen window at the Feuerwehr Kirbe: guests hand in a prepaid m
 - **Back to queue** (on screen: _Zurück in Warteschlange_) — a buzzed plate that can't be handed out (dropped, spoiled, left too long) is taken off the order, which waits for that product again with its FIFO place kept. Formerly called _Discard_; avoid that word.
 - **Missing pager** — a pager number taken out of use because the device is lost, not returned or broken. Not offered at intake until restored.
 - **Sold out** — a product the kitchen has run out of, toggled by staff. Intake warns before entering it; open orders still waiting for it are listed so staff can cancel those plates.
+- **Standalone** (on screen: _Eigenständig_) — an iPad that keeps its own event log with no server. The default, and the fallback.
+- **Sync mode** — two or more iPads at the window share one event log through the server. A tap counts once the server has it.
+- **Server** — the small program on the Pi at the venue that holds the shared event log in order. It knows nothing about orders or pagers.
+- **Mirror** — an iPad's full copy of the server's event log in sync mode. It keeps the board visible while disconnected, and standalone carries on from it. Never on screen.
+- **Event log** (on screen: _Protokoll_) — every recorded staff action, in order. The truth the board is computed from.
+- **Pairing code** (on screen: _Kopplungscode_) — the shared code an iPad sends with every request to the server.
+- **Device name** (on screen: _Gerätename_) — an iPad's short name, shown in the undo label and in the replacement toasts.
+- **Connect / Disconnect** (on screen: _Verbinden_ / _Trennen_) — switching an iPad into sync mode and back to standalone. Disconnecting keeps the mirror.
+- **Replace the log** — a first push, _Neues Fest starten_, _Import_, or _Server überschreiben_. The server archives the old log and every iPad follows.
+- **Archive** — the server's copy of every replaced log, as an export file.
+- Avoid _merge_ (logs are never merged), and _sync_ as an on-screen verb.
 - **Update** — a newer build of the app. It takes over on the iPad only when staff tap _Aktualisieren_ in the Verwaltung, never on its own.
 
 ## On-screen language
 
-The UI is German only. Domain term → on-screen word: Buzz → _Rufen / gerufen_; Re-buzz → _Nochmal rufen_; Hand on → _Weitergeben_; Back to queue → _Zurück in Warteschlange_; Cancel → _Stornieren_; Handover → _Ausgabe_; Board → _Übersicht_; Meal voucher / plate → _Bon / Teller_; Missing pager → _Pager fehlt_; Sold out → _Ausverkauft markieren_ (header button: _Ausverkauft…_); Undo → _Rückgängig_; Pager return → _Pager N zurücknehmen_; Status screen → _Verwaltung_; Update check → _Nach Updates suchen_; Install update → _Aktualisieren_; All pagers out → _Alle Pager vergeben_.
+The UI is German only. Domain term → on-screen word: Buzz → _Rufen / gerufen_; Re-buzz → _Nochmal rufen_; Hand on → _Weitergeben_; Back to queue → _Zurück in Warteschlange_; Cancel → _Stornieren_; Handover → _Ausgabe_; Board → _Übersicht_; Meal voucher / plate → _Bon / Teller_; Missing pager → _Pager fehlt_; Sold out → _Ausverkauft markieren_ (header button: _Ausverkauft…_); Undo → _Rückgängig_; Pager return → _Pager N zurücknehmen_; Status screen → _Verwaltung_; Update check → _Nach Updates suchen_; Install update → _Aktualisieren_; All pagers out → _Alle Pager vergeben_; Standalone → _Eigenständig_; Connect → _Verbinden_; Disconnect → _Trennen_; Pairing code → _Kopplungscode_; Device name → _Gerätename_; Event log → _Protokoll_.

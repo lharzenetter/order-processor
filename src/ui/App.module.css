@@ -5,6 +5,19 @@
   height: 100dvh;
 }
 
+.board {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Readable but plainly not tappable while taps wouldn't count. */
+.locked {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
 /* Three step columns side by side; separation by rules, not cards. */
 .shell {
   display: flex;
@@ -55,4 +68,9 @@
 .message {
   padding: 24px;
   font-size: 20px;
+}
+
+/* Only a wrapper to make the open dialog inert while a tap is pending. */
+.dialogs {
+  display: contents;
 }

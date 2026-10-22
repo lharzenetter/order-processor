@@ -4,11 +4,16 @@ import styles from "./Header.module.css";
 
 export function Header({
   state,
+  connectionStatus,
+  actionsEnabled,
   onSoldOut,
   onUndo,
   onVerwaltung,
 }: {
   state: State;
+  /** Eigenständig, Verbunden als …: appended to the counts line. */
+  connectionStatus: string;
+  actionsEnabled: boolean;
   onSoldOut: () => void;
   onUndo: () => void;
   onVerwaltung: () => void;
@@ -21,19 +26,24 @@ export function Header({
       <div className={styles.titles}>
         <span className={styles.title}>Kirbe Essensausgabe</span>
         <span className={styles.counts}>
-          {openOrders} offen · {freePagers} Pager frei
+          {openOrders} offen · {freePagers} Pager frei · {connectionStatus}
         </span>
       </div>
       <button
         type="button"
         className={styles.undo}
-        disabled={target === null}
+        disabled={target === null || !actionsEnabled}
         onClick={onUndo}
       >
         ↶ Rückgängig
         <small>{target?.label ?? "nichts rückgängig zu machen"}</small>
       </button>
-      <button type="button" className={styles.textButton} onClick={onSoldOut}>
+      <button
+        type="button"
+        className={styles.textButton}
+        disabled={!actionsEnabled}
+        onClick={onSoldOut}
+      >
         Ausverkauft…
         {soldOutCount > 0 && ` (${String(soldOutCount)})`}
       </button>

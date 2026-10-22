@@ -64,6 +64,25 @@ describe("Rückgängig", () => {
     expect(log.events).toHaveLength(4);
   });
 
+  // server-sync 03: the label names the iPad the action came from, on every iPad
+  it("names the iPad the newest action came from", () => {
+    const log = testLog({ device: "iPad 2" });
+    const order = log.add({
+      type: "orderTaken",
+      pager: 12,
+      plates: [{ productId: "braten", count: 1 }],
+    });
+    log.add({
+      type: "platesBuzzed",
+      orderId: order.id,
+      productId: "braten",
+      count: 1,
+    });
+    expect(undoTarget(fold(log.events))?.label).toBe(
+      "Braten gerufen → Pager 12 (iPad 2)",
+    );
+  });
+
   it("refuses to undo anything but the current target", () => {
     const log = testLog();
     const first = log.add({ type: "pagerMarkedMissing", pager: 3 });
