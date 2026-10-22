@@ -9,6 +9,8 @@ In the commands, `<DOMAIN>` is the IONOS domain from `.env` and the server's nam
 
 ## 1. One-time setup
 
+Without a Pi, or with dnsmasq not answering, see the alternatives in section 7.
+
 ### 1.1 The Pi
 
 1. Flash Raspberry Pi OS Lite (64-bit) onto the SSD with Raspberry Pi Imager. Set a user, SSH and
@@ -216,3 +218,69 @@ cable and the FRITZ!Box config export into the kit.
 2. Change the pairing code.
 3. Set up a new Pi from section 1 and restore the last `data/` backup into `/opt/kirbe/data/`
    (owned by uid 1000).
+
+## 7. Alternatives
+
+### 7.1 A Windows PC with WSL2 instead of the Pi
+
+By default WSL2 sits behind its own NAT with a `172.x` address, so a port bound to `PI_IP` inside
+WSL never reaches the venue network. Windows may also answer on port 53 itself, through
+Internet Connection Sharing (`SharedAccess`). Then `dig @<PI_IP> kirbe.<DOMAIN>` replies at once
+with `NOERROR` and no address, and `docker compose logs dnsmasq` stays empty, because no query
+reaches the container.
+
+This needs Windows 11 22H2 or newer and Docker Engine installed inside the WSL distribution, not
+Docker Desktop. `/opt/kirbe/` lives inside WSL, and sections 1.2 to 1.8 apply from there unchanged.
+
+1. Fix the PC's IP on the FRITZ!Box as in 1.5. That address is `PI_IP`.
+2. Let WSL share the PC's addresses. In `%UserProfile%\.wslconfig`:
+
+   ```ini
+   [wsl2]
+   networkingMode=mirrored
+   ```
+
+   Then `wsl --shutdown` in PowerShell, and open WSL again.
+
+3. Free port 53 on Windows. In PowerShell as administrator,
+   `netstat -ano -p udp | findstr ":53 "` and `Get-Process -Id <PID>` show what holds it. If it is
+   Internet Connection Sharing and nothing else on the PC needs it:
+
+   ```powershell
+   Stop-Service SharedAccess
+   Set-Service SharedAccess -StartupType Disabled
+   ```
+
+4. Allow inbound DNS and HTTPS through the Windows and the Hyper-V firewall:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "kirbe dns udp" -Direction Inbound -Protocol UDP -LocalPort 53 -Action Allow
+   New-NetFirewallRule -DisplayName "kirbe dns tcp" -Direction Inbound -Protocol TCP -LocalPort 53 -Action Allow
+   New-NetFirewallRule -DisplayName "kirbe https" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+   Set-NetFirewallHyperVVMSetting -Name '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -DefaultInboundAction Allow
+   ```
+
+5. In WSL, `docker compose up -d`. From another device on the venue network,
+   `dig @<PI_IP> kirbe.<DOMAIN> +short` must print `PI_IP`.
+
+The PC must not sleep during the Fest, and WSL starts only after someone logs in to Windows, so
+`docker compose up -d` is a step on Fest day. Pulling the plug is no longer harmless.
+
+### 7.2 A public A record instead of dnsmasq
+
+Instead of the local dnsmasq, IONOS answers `kirbe.<DOMAIN>` with the private `PI_IP` for anyone
+who asks. This needs no port 53 on the host, no local DNS setting on the FRITZ!Box and no IPv6
+setting. In return, the iPads find the server only while the FRITZ!Box has internet, and the
+venue's private address is visible in public DNS.
+
+1. At IONOS, under the domain's _DNS_ settings, add an `A` record: host `kirbe`, value `PI_IP`.
+2. On the FRITZ!Box, _Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz_: add
+   `kirbe.<DOMAIN>` to the exceptions. Without that, the FRITZ!Box drops answers that point at
+   a private address.
+3. Leave out 1.5 step 3 and the `dnsmasq.conf` edits, and start only the server:
+   `docker compose up -d server`.
+4. Check from a device on the venue network: `dig kirbe.<DOMAIN> +short` prints `PI_IP`.
+
+Certificates work as before (1.6), since lego uses a TXT record and does not care about the A
+record. If the uplink fails on Fest day, the iPads lose the name too: the fallback is standalone
+on one iPad (section 4).
