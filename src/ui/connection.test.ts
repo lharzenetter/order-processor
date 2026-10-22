@@ -1,7 +1,12 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeSyncServer, FORMAT_VERSION } from "../storage/index";
-import { connectionLabel, followToast, nextConnection } from "./connection";
+import {
+  connectionLabel,
+  followToast,
+  kitchenDisplayStale,
+  nextConnection,
+} from "./connection";
 import { syncIpad, TEST_SETTINGS, tick } from "./sync-test-ipad";
 
 beforeEach(() => {
@@ -155,5 +160,28 @@ describe("the toast on a following iPad", () => {
     ["overwrite", "Server von „Annahme“ überschrieben"],
   ] as const)("names who did %s", (reason, text) => {
     expect(followToast({ device: "Annahme", reason })).toBe(text);
+  });
+});
+
+describe("the Küchenanzeige's numbers", () => {
+  it("are live only while connected", () => {
+    expect(kitchenDisplayStale("connected", null, false)).toBeNull();
+  });
+
+  // Nobody at the kitchen answers the server's question: staff end the Küchenanzeige and answer it.
+  it("go stale while the server waits for an answer", () => {
+    expect(kitchenDisplayStale("connecting", null, true)).toBe(
+      "Rückfrage vom Server – Küchenanzeige beenden (lange drücken)",
+    );
+  });
+
+  it.each([
+    ["connecting", null, "Verbinde… – Zahlen veraltet"],
+    ["disconnected", null, "Keine Verbindung – Zahlen veraltet"],
+    ["standalone", null, "Keine Verbindung – Zahlen veraltet"],
+    ["rejected", "pairingCode", "Kopplungscode falsch – Zahlen veraltet"],
+    ["rejected", "version", "Version passt nicht – Zahlen veraltet"],
+  ] as const)("go stale when %s (%s)", (connection, reason, banner) => {
+    expect(kitchenDisplayStale(connection, reason, false)).toBe(banner);
   });
 });

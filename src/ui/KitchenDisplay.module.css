@@ -1,0 +1,94 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--white);
+}
+
+.stale {
+  margin: 0;
+  padding: 16px;
+  background: var(--dark-red);
+  color: var(--white);
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tiles {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+/* Old numbers must not read as current ones. */
+.staleTiles {
+  opacity: 0.35;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid var(--navy);
+  background: var(--navy);
+  color: var(--white);
+}
+
+.zero {
+  border-color: var(--gray-light);
+  background: var(--white);
+  color: var(--gray-dark);
+}
+
+.count {
+  font-size: clamp(96px, 18vw, 240px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.corner {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  padding: 0 16px 16px;
+}
+
+.corner button {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.product {
+  min-height: 56px;
+  border: 2px solid var(--black);
+  text-align: left;
+}
+
+.selected {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--white);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}

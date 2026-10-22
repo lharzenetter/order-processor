@@ -82,6 +82,8 @@ export interface Meta {
   readonly logId?: string;
   /** The highest `seq` the mirror knows the server has. */
   readonly serverSeq?: number;
+  /** Set while this iPad is a Küchenanzeige: its product selection. */
+  readonly kitchenDisplay?: readonly string[];
 }
 
 /** The JSON an export writes and an import reads. */
@@ -117,6 +119,9 @@ export interface DeviceStore extends EventLog {
   saveSettings(settings: SyncSettings): Promise<void>;
   /** Trennen: the mirror, its log and the other settings stay for reconnecting. */
   clearServerAddress(): Promise<void>;
+  /** Makes this iPad a Küchenanzeige, or changes its product selection; survives a restart. */
+  saveKitchenDisplay(productSelection: readonly string[]): Promise<void>;
+  endKitchenDisplay(): Promise<void>;
   close(): void;
 }
 
@@ -143,7 +148,8 @@ type MetaKey =
   | "persisted"
   | keyof SyncSettings
   | "logId"
-  | "serverSeq";
+  | "serverSeq"
+  | "kitchenDisplay";
 
 type Database = IDBPDatabase<Schema>;
 
@@ -228,6 +234,7 @@ function deviceStore(db: Database): DeviceStore {
         deviceName,
         logId,
         serverSeq,
+        kitchenDisplay,
       ] = await Promise.all([
         meta.get("formatVersion"),
         tx.objectStore("events").count(),
@@ -238,6 +245,7 @@ function deviceStore(db: Database): DeviceStore {
         meta.get("deviceName"),
         meta.get("logId"),
         meta.get("serverSeq"),
+        meta.get("kitchenDisplay"),
       ]);
       return {
         formatVersion,
@@ -249,6 +257,7 @@ function deviceStore(db: Database): DeviceStore {
         ...(typeof deviceName === "string" ? { deviceName } : {}),
         ...(typeof logId === "string" ? { logId } : {}),
         ...(typeof serverSeq === "number" ? { serverSeq } : {}),
+        ...(isStringArray(kitchenDisplay) ? { kitchenDisplay } : {}),
       };
     },
     async exportFile(at) {
@@ -317,6 +326,12 @@ function deviceStore(db: Database): DeviceStore {
     async clearServerAddress() {
       await db.delete("meta", "serverAddress");
     },
+    async saveKitchenDisplay(productSelection) {
+      await db.put("meta", [...productSelection], "kitchenDisplay");
+    },
+    async endKitchenDisplay() {
+      await db.delete("meta", "kitchenDisplay");
+    },
     close() {
       db.close();
     },
@@ -360,4 +375,10 @@ export function readableEvents(events: readonly unknown[]): readonly Event[] {
     );
   }
   return valid;
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }

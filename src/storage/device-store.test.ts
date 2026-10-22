@@ -350,6 +350,24 @@ describe("the mirror and the server settings", () => {
     expect(meta.serverSeq).toBeUndefined();
   });
 
+  it("remembers the Küchenanzeige and its product selection across a reopen, until it is ended", async () => {
+    const name = freshName();
+    const store = await readyStore(name);
+    expect((await store.meta()).kitchenDisplay).toBeUndefined();
+    await store.saveKitchenDisplay(["flammkuchen", "flammkuchen-veggie"]);
+    store.close();
+
+    const reopened = await readyStore(name);
+    expect((await reopened.meta()).kitchenDisplay).toEqual([
+      "flammkuchen",
+      "flammkuchen-veggie",
+    ]);
+    expect(await reopened.load()).toEqual([]);
+
+    await reopened.endKitchenDisplay();
+    expect((await reopened.meta()).kitchenDisplay).toBeUndefined();
+  });
+
   it("keeps the connection settings on Neues Fest starten", async () => {
     const store = await readyStore();
     await store.saveSettings(settings);

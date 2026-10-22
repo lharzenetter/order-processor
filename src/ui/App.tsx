@@ -16,6 +16,7 @@ import { GerufenColumn } from "./GerufenColumn";
 import { handedOverText } from "./handover-text";
 import { Header } from "./Header";
 import { IntakeDialog } from "./IntakeDialog";
+import { KitchenDisplay } from "./KitchenDisplay";
 import { OrderDialog } from "./OrderDialog";
 import type { LineActions } from "./OrderDialog";
 import shared from "./shared.module.css";
@@ -187,6 +188,26 @@ export function App() {
         />
         <Toasts toasts={toasts} />
       </>
+    );
+  }
+
+  // The Küchenanzeige records nothing, so none of the window's controls, dialogs or toasts show.
+  const kitchenDisplay = board.meta?.kitchenDisplay;
+  if (kitchenDisplay !== undefined) {
+    return (
+      <KitchenDisplay
+        state={state}
+        productSelection={kitchenDisplay}
+        connection={connection}
+        rejectedReason={board.rejectedReason}
+        decidePending={decide !== null}
+        onSaveSelection={(productSelection) => {
+          void board.saveKitchenDisplay(productSelection);
+        }}
+        onEnd={() => {
+          void board.endKitchenDisplay();
+        }}
+      />
     );
   }
 

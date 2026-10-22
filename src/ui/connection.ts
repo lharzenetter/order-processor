@@ -66,6 +66,37 @@ export function connectionLabel(
   }
 }
 
+/**
+ * The Küchenanzeige's banner, or `null` while its numbers are live. A frozen count would have the
+ * kitchen stop cooking, so every state but `connected` says the numbers are old.
+ */
+export function kitchenDisplayStale(
+  connection: Connection,
+  rejectedReason: RejectedReason | null,
+  decidePending: boolean,
+): string | null {
+  // The answer may replace this iPad's log, so it is never given silently: staff give it at the
+  // board, behind its export guard.
+  if (decidePending) {
+    return "Rückfrage vom Server – Küchenanzeige beenden (lange drücken)";
+  }
+  switch (connection) {
+    case "connected":
+      return null;
+    case "connecting":
+      return "Verbinde… – Zahlen veraltet";
+    case "standalone":
+    case "disconnected":
+      return "Keine Verbindung – Zahlen veraltet";
+    case "rejected":
+      return rejectedReason === "version"
+        ? "Version passt nicht – Zahlen veraltet"
+        : "Kopplungscode falsch – Zahlen veraltet";
+    default:
+      return assertNever(connection);
+  }
+}
+
 type FollowedBy = NonNullable<Extract<LogChange, { kind: "replaced" }>["by"]>;
 
 /** The toast on an iPad that followed another iPad's replacement. */

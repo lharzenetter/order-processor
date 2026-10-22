@@ -79,6 +79,11 @@ export interface PagerBoard {
   readonly pushLocal: () => Promise<ReplaceResult>;
   /** Anderes Protokoll auf dem Server: Durch Server-Protokoll ersetzen. */
   readonly adoptServer: () => Promise<void>;
+  /** Makes this iPad a Küchenanzeige for the product selection, or changes it. */
+  readonly saveKitchenDisplay: (
+    productSelection: readonly string[],
+  ) => Promise<void>;
+  readonly endKitchenDisplay: () => Promise<void>;
 }
 
 const REPLACED: ReplaceResult = { kind: "replaced" };
@@ -434,6 +439,19 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
     );
   }, [replaceWith]);
 
+  const saveKitchenDisplay = useCallback(
+    async (productSelection: readonly string[]) => {
+      await store?.saveKitchenDisplay(productSelection);
+      await refreshMeta();
+    },
+    [store, refreshMeta],
+  );
+
+  const endKitchenDisplay = useCallback(async () => {
+    await store?.endKitchenDisplay();
+    await refreshMeta();
+  }, [store, refreshMeta]);
+
   return {
     status,
     state,
@@ -458,6 +476,8 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
     overwriteServer,
     pushLocal,
     adoptServer,
+    saveKitchenDisplay,
+    endKitchenDisplay,
   };
 }
 

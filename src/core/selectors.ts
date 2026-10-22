@@ -326,6 +326,26 @@ export function openOrdersList(state: State): readonly OpenOrdersListEntry[] {
     }));
 }
 
+export interface WaitingPlatesRow {
+  readonly productId: string;
+  readonly label: string;
+  readonly waiting: number;
+}
+
+/** The Küchenanzeige: per product in the product selection, the plates open orders wait for. */
+export function waitingPlates(
+  state: State,
+  productSelection: readonly string[],
+): readonly WaitingPlatesRow[] {
+  return MENU.filter(({ id }) => productSelection.includes(id)).map(
+    ({ id, label }) => ({
+      productId: id,
+      label,
+      waiting: sum(queueFor(state, id).map(({ line }) => waitingOf(line))),
+    }),
+  );
+}
+
 function sum(values: readonly number[]): number {
   return values.reduce((a, b) => a + b, 0);
 }

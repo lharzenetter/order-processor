@@ -7,6 +7,7 @@ import type { ReplaceResult } from "../storage/index";
 import { cx } from "./cx";
 import { exportLog, readExportFile } from "./export-log";
 import { formatClock } from "./format";
+import { AuswahlDialog } from "./KitchenDisplay";
 import { LongPressButton } from "./LongPressButton";
 import { ModalDialog } from "./ModalDialog";
 import { ServerSection } from "./ServerSection";
@@ -50,6 +51,7 @@ export function Verwaltung({
   const [view, setView] = useState<View>("main");
   const [guard, setGuard] = useState<Guard | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [choosingKitchenDisplay, setChoosingKitchenDisplay] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const eventCount = meta?.eventCount ?? 0;
   const versionRow = updateRow(
@@ -216,10 +218,36 @@ export function Verwaltung({
               >
                 Offene Bestellungen
               </button>
+              <button
+                type="button"
+                disabled={!synced}
+                onClick={() => {
+                  setChoosingKitchenDisplay(true);
+                }}
+              >
+                Küchenanzeige…
+                {!synced && (
+                  <small className={styles.sub}>
+                    Erst mit dem Server verbinden
+                  </small>
+                )}
+              </button>
             </>
           )}
         </div>
       </section>
+      {choosingKitchenDisplay && (
+        <AuswahlDialog
+          initial={meta?.kitchenDisplay ?? []}
+          onSave={(productSelection) => {
+            setChoosingKitchenDisplay(false);
+            void board.saveKitchenDisplay(productSelection).then(onBack);
+          }}
+          onClose={() => {
+            setChoosingKitchenDisplay(false);
+          }}
+        />
+      )}
 
       <section className={styles.section}>
         <h2 className={shared.heading}>Version</h2>

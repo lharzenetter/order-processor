@@ -20,6 +20,7 @@ export {
   pagerCheck,
   pagerOverview,
   soldOutWaiting,
+  waitingPlates,
 } from "./selectors";
 export type {
   BoardRow,
@@ -32,6 +33,7 @@ export type {
   PagerOverview,
   QueuedOrder,
   SoldOutWaiting,
+  WaitingPlatesRow,
 } from "./selectors";
 export { INITIAL_STATE } from "./state";
 export type { ClosedBy, Line, Order, State } from "./state";

@@ -214,6 +214,71 @@ test("an iPad holding events the server never saw must export first", async ({
   await expect(second.getByText("0 offen · 30 Pager frei")).toBeVisible();
 });
 
+test("a Küchenanzeige shows only the waiting plates of its Auswahl", async ({
+  browser,
+}) => {
+  const window = await ipad(browser);
+  await connect(window, "Annahme");
+  await connectedAs(window, "Annahme");
+  await closeVerwaltung(window);
+  await takeOrder(window, { Flammkuchen: 2, Braten: 1 }, 7);
+
+  const kitchen = await ipad(browser);
+  await connect(kitchen, "Küche");
+  await connectedAs(kitchen, "Küche");
+  const verwaltung = kitchen.getByRole("region", { name: "Verwaltung" });
+  await verwaltung.getByRole("button", { name: "Küchenanzeige…" }).click();
+  const auswahl = kitchen.getByRole("dialog", {
+    name: "Auswahl für die Küchenanzeige",
+  });
+  await auswahl
+    .getByRole("button", { name: "Flammkuchen", exact: true })
+    .click();
+  await auswahl.getByRole("button", { name: "Flammkuchen Veggie" }).click();
+  await auswahl.getByRole("button", { name: "Küchenanzeige zeigen" }).click();
+
+  const display = kitchen.getByTestId("kitchen-display");
+  const flammkuchen = display.getByRole("group", {
+    name: "Flammkuchen",
+    exact: true,
+  });
+  await expect(flammkuchen).toHaveText("2Flammkuchen");
+  await expect(
+    display.getByRole("group", { name: "Flammkuchen Veggie" }),
+  ).toHaveText("0Flammkuchen Veggie");
+  await expect(display).not.toContainText("Braten");
+  await expect(
+    kitchen.getByRole("button", { name: /Neue Bestellung/ }),
+  ).toHaveCount(0);
+
+  await takeOrder(window, { Flammkuchen: 1 }, 8);
+  await expect(flammkuchen).toHaveText("3Flammkuchen");
+
+  await kitchen.reload();
+  await expect(flammkuchen).toHaveText("3Flammkuchen", { timeout: 40_000 });
+
+  await kitchen.context().setOffline(true);
+  await kitchen.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  const stale = kitchen.getByRole("alert");
+  await expect(stale).toHaveText("Keine Verbindung – Zahlen veraltet", {
+    timeout: 40_000,
+  });
+  await kitchen.context().setOffline(false);
+  await expect(stale).toBeHidden({ timeout: 40_000 });
+
+  await longPress(kitchen, "Küchenanzeige (lange drücken)");
+  await kitchen
+    .getByRole("dialog", { name: "Küchenanzeige" })
+    .getByRole("button", { name: "Küchenanzeige beenden" })
+    .click();
+  await expect(
+    kitchen.getByRole("button", { name: /^\+ Neue Bestellung/ }),
+  ).toBeVisible();
+  await connectedAs(kitchen, "Küche");
+});
+
 test("standalone never reaches beyond this machine", async ({ page }) => {
   const hosts = new Set<string>();
   page.on("request", (request) => {
