@@ -1,0 +1,15 @@
+{
+  // The sync server runs as TypeScript through Node's type stripping, so only erasable syntax and
+  // `.ts` import paths; no DOM, only Node's own globals.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["server"]
+}

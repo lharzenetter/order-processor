@@ -1,0 +1,58 @@
+# Mirrors /opt/kirbe/ on the Pi and is copied there as-is. No venue values live here: they come from
+# .env next to this file (see env.example). The data/ and certs/ directories must belong to uid 1000,
+# the user both the server and lego run as.
+name: kirbe
+
+services:
+  server:
+    # An exact release, never latest: a new FORMAT_VERSION reaches the Fest only with a bumped tag.
+    image: ghcr.io/lharzenetter/order-processor-server:${SERVER_TAG:?set SERVER_TAG in .env}
+    restart: unless-stopped
+    environment:
+      PAIRING_CODE: ${PAIRING_CODE:?set PAIRING_CODE in .env}
+      ALLOWED_ORIGIN: https://lharzenetter.github.io
+      CERT_FILE: /certs/certificates/kirbe.${DOMAIN:?set DOMAIN in .env}.crt
+      KEY_FILE: /certs/certificates/kirbe.${DOMAIN}.key
+      DATA_DIR: /data
+    volumes:
+      - ./certs:/certs:ro
+      - ./data:/data
+    ports:
+      - "443:8443"
+    healthcheck:
+      test: ["CMD", "node", "server/healthcheck.ts"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Never starts by itself. Renews unconditionally, at home before each Fest:
+  #   docker compose run --rm lego renew --days 90
+  # The very first certificate is issued with `docker compose run --rm lego run`.
+  lego:
+    image: goacme/lego:v4.26.0
+    profiles: [renew]
+    user: "1000:1000"
+    env_file: secrets/ionos.env
+    environment:
+      LEGO_PATH: /certs
+    entrypoint:
+      - /lego
+      - --accept-tos
+      - --dns
+      - ionos
+      - --domains
+      - kirbe.${DOMAIN}
+    command: [renew, --days, "90"]
+    volumes:
+      - ./certs:/certs
+
+  # Answers kirbe.<domain> with the Pi's IP; the FRITZ!Box hands the Pi out as its local DNS server.
+  dnsmasq:
+    image: 4km3/dnsmasq:2.90-r3
+    restart: unless-stopped
+    ports:
+      - "${PI_IP:?set PI_IP in .env}:53:53/udp"
+      - "${PI_IP}:53:53/tcp"
+    volumes:
+      - ./dnsmasq.conf:/etc/dnsmasq.conf:ro

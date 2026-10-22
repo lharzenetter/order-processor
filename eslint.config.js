@@ -3,6 +3,7 @@ import prettier from "eslint-config-prettier";
 import reactHooks from "eslint-plugin-react-hooks";
 import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
+import { builtinModules } from "node:module";
 import tseslint from "typescript-eslint";
 
 // The layer import table from CODING_STANDARDS.md: which layers each layer may import.
@@ -10,9 +11,11 @@ const LAYERS = {
   core: [],
   storage: ["core"],
   ui: ["core", "storage"],
+  server: [],
 };
 
-const LAYER_NAMES = Object.keys(LAYERS);
+// The src/ layers; server/ sits at the top level and gets its own rule below.
+const LAYER_NAMES = Object.keys(LAYERS).filter((layer) => layer !== "server");
 
 function layerBoundaryRule(layer) {
   const forbidden = LAYER_NAMES.filter(
@@ -37,7 +40,42 @@ function layerBoundaryRule(layer) {
       message: "Only the ui layer imports React.",
     });
   }
+  patterns.push({
+    regex: String.raw`^(\.\./)+server(/|$)`,
+    message: "src/ never imports server/.",
+  });
   return ["error", { patterns }];
+}
+
+// server/ runs without npm runtime dependencies: only `node:` built-ins and its own files. Tests may
+// also import Vitest.
+function serverImportRule({ allowVitest }) {
+  const allowed = [
+    String.raw`\.{1,2}/`,
+    "node:",
+    ...(allowVitest ? ["vitest$"] : []),
+  ];
+  return [
+    "error",
+    {
+      paths: builtinModules
+        .filter((name) => !name.startsWith("node:") && !name.startsWith("_"))
+        .map((name) => ({
+          name,
+          message: `Import the built-in with its prefix: node:${name}.`,
+        })),
+      patterns: [
+        {
+          regex: String.raw`^(\.\./)+src(/|$)`,
+          message: "server/ imports nothing from src/.",
+        },
+        {
+          regex: `^(?!${allowed.join("|")})`,
+          message: "server/ imports only node: built-ins and its own files.",
+        },
+      ],
+    },
+  ];
 }
 
 const DEFAULT_EXPORT_SYNTAX = [
@@ -102,6 +140,19 @@ export default defineConfig(
     rules: { "no-restricted-imports": layerBoundaryRule(layer) },
   })),
   {
+    files: ["server/**/*.ts"],
+    languageOptions: { globals: globals.node },
+    rules: {
+      "no-restricted-imports": serverImportRule({ allowVitest: false }),
+    },
+  },
+  {
+    files: ["server/**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": serverImportRule({ allowVitest: true }),
+    },
+  },
+  {
     // Time reaches the core only through events; timers already fail the pure typecheck.
     files: ["src/core/**/*.ts"],
     ignores: ["src/core/**/*.test.ts"],
@@ -121,7 +172,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["**/*.test.{ts,tsx}", "e2e/**/*.ts"],
+    files: ["**/*.test.{ts,tsx}", "e2e/**/*.ts", "contract/**/*.ts"],
     rules: { "@typescript-eslint/consistent-type-assertions": "off" },
   },
   {

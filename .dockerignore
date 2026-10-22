@@ -1,0 +1,4 @@
+# The image needs only the server; its tests stay out.
+*
+!server/
+server/**/*.test.ts

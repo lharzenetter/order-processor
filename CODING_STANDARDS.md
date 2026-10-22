@@ -4,7 +4,8 @@ How code is written in this repository. These rules are normative: every change 
 Adapted from `lharzenetter/checkbox-similator`.
 
 Stack: TypeScript (strict) + Vite, a framework-free core, React UI, IndexedDB via `idb`,
-`vite-plugin-pwa`, pnpm, Vitest, Playwright, ESLint + Prettier.
+`vite-plugin-pwa`, a Node sync server on built-ins only (`node:https`, `node:sqlite`), pnpm, Vitest,
+Playwright, ESLint + Prettier.
 
 ## Naming
 
@@ -23,12 +24,21 @@ Stack: TypeScript (strict) + Vite, a framework-free core, React UI, IndexedDB vi
 | `core/`    | Pure fold/reducer, selectors, parameters, menu data      | nothing    | no           |
 | `storage/` | Event log in IndexedDB, export/import, clearing the log  | `core`     | yes          |
 | `ui/`      | React screens; `usePagerBoard()` owns state and dispatch | everything | yes          |
+| `server/`  | Sync API, the SQLite log, the archive and the env config | nothing    | Node only    |
 
 - Imports point one way only, as in the table. Only `ui/` imports React.
 - `core/` has no DOM, no `Date.now()`, no timers and no randomness.
 - Each layer exposes one public entry, `src/<layer>/index.ts`; other layers import only from it.
+- `server/` sits at the top level, not in `src/`. It imports nothing from `src/`, and `src/` never
+  imports `server/`; it imports only `node:` built-ins, always with the prefix, and its own files.
+  Its entry points: `server/index.ts` (the `Request → Response` handler and the broadcast hook),
+  `server/main.ts` (the only file that listens, and with the healthcheck the only one that reads
+  `process.env`) and `server/healthcheck.ts` (a separate program the container runs).
+- `contract/` and `e2e/` are test-only and exempt from the layer boundaries.
 - Enforcement: ESLint `no-restricted-imports` per folder, and `tsconfig.pure.json` for `core`
-  with `lib: ["ES2022"]` and no `DOM`.
+  with `lib: ["ES2022"]` and no `DOM`. `server/` gets `globals.node`, no React hooks plugin, and
+  `tsconfig.server.json` (`lib: ["ES2023"]`, no `DOM`, `module: "nodenext"`,
+  `erasableSyntaxOnly`, imports ending in `.ts`), since Node runs it through type stripping.
 
 ## The core
 
@@ -46,6 +56,14 @@ Stack: TypeScript (strict) + Vite, a framework-free core, React UI, IndexedDB vi
 - Times are integer milliseconds named `…Ms` or `…At`. Parameters live in `core/parameters.ts`,
   the menu in `core/menu.ts`.
 
+## The server
+
+- **The server never runs `reduce`.** It parses an event no further than the protocol's shape
+  checks (an object with a string `id` and an integer `seq`) and stores it as received.
+- The clock is read only for archive names and pings.
+- Never log the pairing code or a query string: a log line holds at most method, path and status.
+- Every existing rule applies to `server/` unchanged.
+
 ## Testing
 
 - `core/` is written test-first (red, green) for every behaviour change.
@@ -53,6 +71,10 @@ Stack: TypeScript (strict) + Vite, a framework-free core, React UI, IndexedDB vi
   `storage/` is tested through `openDeviceStore` with `fake-indexeddb`.
 - No real timers. Test names describe behaviour in glossary language.
 - A test for a rule from a map ticket cites it: `// 05-exceptions`.
+- `server/` is test-first for every protocol rule, driven through the handler with `Request`
+  objects on a SQLite file in a fresh temp directory. A protocol scenario is written once, in
+  `contract/`, and runs against both the fake sync server and the real handler. A rule from a
+  ticket cites it: `// server-sync 02`.
 - React components get thin tests only where they hold logic. Playwright covers the smoke flows
   on the built app.
 - No coverage gate. Test files sit next to the code.

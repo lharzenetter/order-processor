@@ -4,7 +4,9 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "lib": ["ES2023", "DOM"],
     "types": ["node"],
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // contract/ drives the real server/ handler, whose imports end in `.ts`.
+    "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "e2e"]
+  "include": ["vite.config.ts", "playwright.config.ts", "e2e", "contract"]
 }

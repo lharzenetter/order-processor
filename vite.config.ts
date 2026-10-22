@@ -59,6 +59,10 @@ export default defineConfig(({ command, isPreview }) => ({
     }),
   ],
   test: {
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "server/**/*.test.ts",
+      "contract/**/*.test.ts",
+    ],
   },
 }));
