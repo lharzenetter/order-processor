@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "sync-server": "node e2e/sync-server.ts",
     "prepare": "husky"
   },
   "lint-staged": {
