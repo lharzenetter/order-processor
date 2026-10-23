@@ -138,6 +138,13 @@ that address. On any other network, start just the server with `docker compose u
 If the server is empty and the iPad already has events, it asks whether to upload them
 (_Hochladen und verbinden_).
 
+A kitchen station iPad is set up the same way, then _Verwaltung → Küchenanzeige…_: tick the dishes
+that station cooks and tap _Küchenanzeige zeigen_. It shows only how many plates of each are still
+waiting, records nothing, and comes back as a Küchenanzeige after a restart. Hold the
+_Küchenanzeige_ button in its corner to change the Auswahl or end it. Greyed-out numbers under a
+red banner are old: the connection is down. _Rückfrage vom Server_ means it must be ended and the
+server's question answered on the normal screen.
+
 ## 2. Pre-Fest session at home (7–14 days before)
 
 The Pi needs internet. iPads at home can reach the server only if the home router also hands
@@ -173,6 +180,8 @@ With two iPads, one with the web app installed from Safari and one from Chrome:
 3. An undo on one shows up on the other.
 4. `docker compose restart server`: both show _Keine Verbindung…_, then reconnect by themselves.
 5. The spinner (after 300 ms) and the 4 s no-reply timeout feel right on that Wi-Fi.
+6. If a kitchen station gets a Küchenanzeige: a new order shows up on it, and its numbers grey out
+   while the server restarts.
 
 Start the Fest with an empty log: _Verwaltung → Neues Fest starten…_. The server archives the old
 log in `data/archive/`.
