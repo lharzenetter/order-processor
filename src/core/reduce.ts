@@ -159,7 +159,13 @@ function handOver(
     checkCount(plate.count, line.buzzed + waitingOf(line));
     // Buzzed plates go first; any rest comes from the waiting ones.
     const fromBuzzed = Math.min(plate.count, line.buzzed);
-    const handed: Line = { ...line, pickedUp: line.pickedUp + plate.count };
+    const handed: Line = {
+      ...line,
+      pickedUp: line.pickedUp + plate.count,
+      pickedUpWaitingTimeMs:
+        line.pickedUpWaitingTimeMs +
+        plate.count * waitingTimeMs(order, event.at),
+    };
     return fromBuzzed === line.buzzed
       ? withoutClock({ ...handed, buzzed: 0 })
       : { ...handed, buzzed: line.buzzed - fromBuzzed };
@@ -282,6 +288,11 @@ export function waitingOf(line: Line): number {
   );
 }
 
+/** From intake to `at`; never below 0, since another iPad's clock may be behind in sync mode. */
+export function waitingTimeMs(order: Order, at: number): number {
+  return Math.max(0, at - order.takenAt);
+}
+
 export function isOpen(order: Order): boolean {
   return order.closedBy === undefined;
 }
@@ -293,6 +304,7 @@ function newLine(productId: string, ordered: number): Line {
     cancelled: 0,
     buzzed: 0,
     pickedUp: 0,
+    pickedUpWaitingTimeMs: 0,
     backToQueue: 0,
     abandoned: 0,
   };

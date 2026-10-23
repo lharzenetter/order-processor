@@ -108,6 +108,7 @@ describe("the Auswertung", () => {
       label: "Braten",
       made: 4,
       handedOver: 2,
+      averageWaitingTimeMs: 0,
       soldOutFirstAt: firstSoldOut.at,
       soldOutCleared: false,
     });

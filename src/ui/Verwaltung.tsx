@@ -6,7 +6,7 @@ import { ImportRejectedError } from "../storage/index";
 import type { ReplaceResult } from "../storage/index";
 import { cx } from "./cx";
 import { exportLog, readExportFile } from "./export-log";
-import { formatClock } from "./format";
+import { formatClock, formatSince } from "./format";
 import { AuswahlDialog } from "./KitchenDisplay";
 import { LongPressButton } from "./LongPressButton";
 import { ModalDialog } from "./ModalDialog";
@@ -469,6 +469,7 @@ function Auswertung({ state }: { state: State }) {
           <th scope="col">Gericht</th>
           <th scope="col">Gemacht</th>
           <th scope="col">Ausgegeben</th>
+          <th scope="col">Ø Wartezeit</th>
           <th scope="col">Ausverkauft um</th>
         </tr>
       </thead>
@@ -478,6 +479,11 @@ function Auswertung({ state }: { state: State }) {
             <th scope="row">{row.label}</th>
             <td>{row.made}</td>
             <td>{row.handedOver}</td>
+            <td>
+              {row.averageWaitingTimeMs === undefined
+                ? "–"
+                : formatSince(row.averageWaitingTimeMs)}
+            </td>
             <td>
               {row.soldOutFirstAt !== undefined &&
                 formatClock(row.soldOutFirstAt)}

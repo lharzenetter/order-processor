@@ -1,4 +1,4 @@
-/** "4:05": minutes and seconds since a buzz. */
+/** "4:05": minutes and seconds, as since a buzz or a waiting time. */
 export function formatSince(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`;

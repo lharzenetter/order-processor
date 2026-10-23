@@ -1,6 +1,6 @@
 import { MENU } from "./menu";
 import { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
-import { isOpen, waitingOf } from "./reduce";
+import { isOpen, waitingOf, waitingTimeMs } from "./reduce";
 import type { ClosedBy, Line, Order, State } from "./state";
 
 /** An order queued for a product, as a pager chip shows it. */
@@ -121,6 +121,8 @@ export interface OrderView {
   readonly orderId: string;
   readonly pager: number;
   readonly takenAt: number;
+  /** From intake to `now`. */
+  readonly waitingTimeMs: number;
   readonly open: boolean;
   readonly closedBy?: ClosedBy;
   /** Only the lines with plates still open, in display order. */
@@ -159,6 +161,7 @@ export function orderView(
     orderId: order.id,
     pager: order.pager,
     takenAt: order.takenAt,
+    waitingTimeMs: waitingTimeMs(order, now),
     open: isOpen(order),
     lines,
   };
@@ -260,6 +263,8 @@ export interface EvaluationRow {
   /** Plates that came out of the kitchen: picked up, abandoned or sent back to the queue. */
   readonly made: number;
   readonly handedOver: number;
+  /** Over every picked-up plate, rounded to whole seconds; absent if none was picked up. */
+  readonly averageWaitingTimeMs?: number;
   /** When the first live `soldOutMarked` happened; absent if never. */
   readonly soldOutFirstAt?: number;
   /** Sold out at some point, but not any more. */
@@ -273,12 +278,21 @@ export function evaluationRows(state: State): readonly EvaluationRow[] {
       order.lines.filter((line) => line.productId === id),
     );
     const handedOver = sum(lines.map((l) => l.pickedUp));
-    const row = {
+    const counts = {
       productId: id,
       label,
       made: handedOver + sum(lines.map((l) => l.abandoned + l.backToQueue)),
       handedOver,
     };
+    const totalWaitingTimeMs = sum(lines.map((l) => l.pickedUpWaitingTimeMs));
+    const row =
+      handedOver === 0
+        ? counts
+        : {
+            ...counts,
+            averageWaitingTimeMs:
+              Math.round(totalWaitingTimeMs / handedOver / 1000) * 1000,
+          };
     const soldOutFirstAt = state.soldOutFirstAt[id];
     return soldOutFirstAt === undefined
       ? { ...row, soldOutCleared: false }

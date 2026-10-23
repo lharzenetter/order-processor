@@ -62,7 +62,8 @@ export function OrderDialog({
           <span className={styles.headingText}>
             Pager {view.pager}
             <small className={shared.muted}>
-              bestellt um {formatClock(view.takenAt)} · {buzzed} von {open}{" "}
+              bestellt um {formatClock(view.takenAt)} · Wartezeit{" "}
+              {formatSince(view.waitingTimeMs)} · {buzzed} von {open}{" "}
               {open === 1 ? "Teller" : "Tellern"} gerufen
             </small>
           </span>

@@ -8,6 +8,8 @@ export interface Line {
   /** Buzzed and not yet picked up. */
   readonly buzzed: number;
   readonly pickedUp: number;
+  /** The waiting times of the picked-up plates, summed. */
+  readonly pickedUpWaitingTimeMs: number;
   readonly backToQueue: number;
   readonly abandoned: number;
   /** Set while `buzzed > 0`: when the line's buzz clock started or was last re-buzzed. */

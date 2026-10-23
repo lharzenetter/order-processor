@@ -44,6 +44,7 @@ describe("the order popup", () => {
       orderId: order.id,
       pager: 7,
       takenAt: order.at,
+      waitingTimeMs: 65_000,
       open: true,
       lines: [
         {
