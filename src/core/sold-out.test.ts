@@ -109,6 +109,7 @@ describe("the Auswertung", () => {
       made: 4,
       handedOver: 2,
       averageWaitingTimeMs: 0,
+      averagePickupTimeMs: 0,
       soldOutFirstAt: firstSoldOut.at,
       soldOutCleared: false,
     });

@@ -160,5 +160,9 @@ test.describe("the Auswertung per Schicht", () => {
       auswertung.getByRole("button", { name: "Ø Wartezeit" }),
     ).toHaveAttribute("aria-pressed", "true");
     await page.screenshot({ path: testInfo.outputPath("nach-schicht.png") });
+    await auswertung.getByRole("button", { name: "Ø Abholzeit" }).click();
+    await expect(
+      auswertung.getByRole("button", { name: "Ø Abholzeit" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  assertNever,
   evaluationRows,
   headerCounts,
   kirbeShifts,
@@ -562,6 +563,7 @@ function EvaluationTable({
           <th scope="col">Gemacht</th>
           <th scope="col">Ausgegeben</th>
           <th scope="col">Ø Wartezeit</th>
+          <th scope="col">Ø Abholzeit</th>
           <th scope="col">Ausverkauft um</th>
         </tr>
       </thead>
@@ -571,7 +573,8 @@ function EvaluationTable({
             <th scope="row">{row.label}</th>
             <td>{row.made}</td>
             <td>{row.handedOver}</td>
-            <td>{waitingText(row)}</td>
+            <td>{averageText(row.averageWaitingTimeMs)}</td>
+            <td>{averageText(row.averagePickupTimeMs)}</td>
             <td>
               {row.soldOutSince !== undefined && `seit ${row.soldOutSince}`}
               {row.soldOutSince !== undefined &&
@@ -588,10 +591,12 @@ function EvaluationTable({
   );
 }
 
+type Figure = "handedOver" | "waiting" | "pickup";
+
 function Vergleich({ state }: { state: State }) {
   const [by, setBy] = useState<ComparisonBy>("crew");
-  // Nine shifts with two figures each are too wide for the iPad: one figure at a time.
-  const [figure, setFigure] = useState<"handedOver" | "waiting">("handedOver");
+  // Nine shifts with three figures each are too wide for the iPad: one figure at a time.
+  const [figure, setFigure] = useState<Figure>("handedOver");
   const comparison = shiftComparison(state, by);
   return (
     <>
@@ -631,6 +636,14 @@ function Vergleich({ state }: { state: State }) {
             >
               Ø Wartezeit
             </Choice>
+            <Choice
+              chosen={figure === "pickup"}
+              onChoose={() => {
+                setFigure("pickup");
+              }}
+            >
+              Ø Abholzeit
+            </Choice>
           </>
         )}
       </div>
@@ -655,7 +668,7 @@ function CrewTable({ comparison }: { comparison: Comparison }) {
             <th
               key={column.id}
               scope="colgroup"
-              colSpan={2}
+              colSpan={3}
               className={styles.crewStart}
             >
               {column.label}
@@ -674,6 +687,7 @@ function CrewTable({ comparison }: { comparison: Comparison }) {
                 Ausgegeben
               </th>
               <th scope="col">Ø Wartezeit</th>
+              <th scope="col">Ø Abholzeit</th>
             </Fragment>
           ))}
         </tr>
@@ -685,7 +699,8 @@ function CrewTable({ comparison }: { comparison: Comparison }) {
             {row.cells.map((cell, i) => (
               <Fragment key={comparison.columns[i]?.id}>
                 <td className={styles.crewStart}>{cell.handedOver}</td>
-                <td>{waitingText(cell)}</td>
+                <td>{averageText(cell.averageWaitingTimeMs)}</td>
+                <td>{averageText(cell.averagePickupTimeMs)}</td>
               </Fragment>
             ))}
           </tr>
@@ -697,7 +712,8 @@ function CrewTable({ comparison }: { comparison: Comparison }) {
           {comparison.totals.map((cell, i) => (
             <Fragment key={comparison.columns[i]?.id}>
               <td className={styles.crewStart}>{cell.handedOver}</td>
-              <td>{waitingText(cell)}</td>
+              <td>{averageText(cell.averageWaitingTimeMs)}</td>
+              <td>{averageText(cell.averagePickupTimeMs)}</td>
             </Fragment>
           ))}
         </tr>
@@ -711,12 +727,19 @@ function ShiftTable({
   figure,
 }: {
   comparison: Comparison;
-  figure: "handedOver" | "waiting";
+  figure: Figure;
 }) {
   function text(cell: ComparisonCell): string {
-    return figure === "handedOver"
-      ? String(cell.handedOver)
-      : waitingText(cell);
+    switch (figure) {
+      case "handedOver":
+        return String(cell.handedOver);
+      case "waiting":
+        return averageText(cell.averageWaitingTimeMs);
+      case "pickup":
+        return averageText(cell.averagePickupTimeMs);
+      default:
+        return assertNever(figure);
+    }
   }
   return (
     <table className={styles.table}>
@@ -752,10 +775,8 @@ function ShiftTable({
   );
 }
 
-function waitingText(cell: ComparisonCell): string {
-  return cell.averageWaitingTimeMs === undefined
-    ? "–"
-    : formatSince(cell.averageWaitingTimeMs);
+function averageText(averageMs: number | undefined): string {
+  return averageMs === undefined ? "–" : formatSince(averageMs);
 }
 
 /** "10:00–15:00", or "ab 19:00" where the plan says Ende. */

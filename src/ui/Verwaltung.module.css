@@ -165,6 +165,20 @@
   white-space: nowrap;
 }
 
+/* Three figures per crew only fit the iPad when their headers may wrap, a little tighter. */
+.comparison {
+  font-size: 18px;
+}
+
+.comparison th,
+.comparison td {
+  padding: 8px 8px;
+}
+
+.comparison thead tr + tr th {
+  white-space: normal;
+}
+
 .crewStart {
   border-left: 2px solid var(--gray-light);
 }

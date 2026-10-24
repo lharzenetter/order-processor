@@ -6,7 +6,6 @@ const PAGER_5: OrderView = {
   orderId: "o1",
   pager: 5,
   takenAt: 0,
-  waitingTimeMs: 0,
   open: true,
   lines: [
     {

@@ -3,7 +3,15 @@ import { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
 import type { Event } from "./event";
 import { kirbeShifts, shiftRange } from "./kirbe-shifts";
 import type { Shift } from "./kirbe-shifts";
-import { fold, isOpen, reduce, waitingOf, waitingTimeMs } from "./reduce";
+import {
+  fold,
+  isOpen,
+  pickupTimeMs,
+  reduce,
+  sum,
+  waitingOf,
+  waitingTimeMs,
+} from "./reduce";
 import { INITIAL_STATE } from "./state";
 import type { ClosedBy, Line, Order, State } from "./state";
 
@@ -119,14 +127,16 @@ export interface OrderViewLine {
   /** Only while plates are buzzed. */
   readonly sinceBuzzMs?: number;
   readonly rebuzzDue?: boolean;
+  /** From intake to `now`; only while plates are waiting. */
+  readonly waitingTimeMs?: number;
+  /** From the oldest buzzed plate's buzz to `now`, re-buzzes aside; only while plates are buzzed. */
+  readonly pickupTimeMs?: number;
 }
 
 export interface OrderView {
   readonly orderId: string;
   readonly pager: number;
   readonly takenAt: number;
-  /** From intake to `now`. */
-  readonly waitingTimeMs: number;
   readonly open: boolean;
   readonly closedBy?: ClosedBy;
   /** Only the lines with plates still open, in display order. */
@@ -154,18 +164,23 @@ export function orderView(
       buzzed: line.buzzed,
       waiting,
       soldOut: state.soldOut.includes(line.productId),
+      ...(waiting === 0 ? {} : { waitingTimeMs: waitingTimeMs(order, now) }),
     };
+    const firstBuzzAt = line.buzzedAt[0];
     return [
-      line.buzzClockFrom === undefined
+      line.buzzClockFrom === undefined || firstBuzzAt === undefined
         ? view
-        : { ...view, ...buzzClock(line.buzzClockFrom, now) },
+        : {
+            ...view,
+            ...buzzClock(line.buzzClockFrom, now),
+            pickupTimeMs: pickupTimeMs(firstBuzzAt, now),
+          },
     ];
   });
   const view = {
     orderId: order.id,
     pager: order.pager,
     takenAt: order.takenAt,
-    waitingTimeMs: waitingTimeMs(order, now),
     open: isOpen(order),
     lines,
   };
@@ -267,8 +282,10 @@ export interface EvaluationRow {
   /** Plates that came out of the kitchen: picked up, abandoned or sent back to the queue. */
   readonly made: number;
   readonly handedOver: number;
-  /** Over every picked-up plate, rounded to whole seconds; absent if none was picked up. */
+  /** Over every picked-up or abandoned plate, rounded to whole seconds; absent if none. */
   readonly averageWaitingTimeMs?: number;
+  /** Over every plate picked up after a buzz, rounded to whole seconds; absent if none. */
+  readonly averagePickupTimeMs?: number;
   /** When the first live `soldOutMarked` happened, within the shift for one; absent if never. */
   readonly soldOutFirstAt?: number;
   /** For one shift: sold out since an earlier shift, as that shift's label. */
@@ -334,7 +351,11 @@ function shiftEvaluationRows(
 interface Plates {
   readonly made: number;
   readonly handedOver: number;
+  /** Plates with a waiting time: picked up or abandoned. */
+  readonly waited: number;
   readonly waitingTimeMs: number;
+  readonly pickedUpAfterBuzz: number;
+  readonly pickupTimeMs: number;
 }
 
 function platesOf(state: State, productId: string): Plates {
@@ -342,32 +363,39 @@ function platesOf(state: State, productId: string): Plates {
     order.lines.filter((line) => line.productId === productId),
   );
   const handedOver = sum(lines.map((l) => l.pickedUp));
+  const abandoned = sum(lines.map((l) => l.abandoned));
   return {
-    made: handedOver + sum(lines.map((l) => l.abandoned + l.backToQueue)),
+    made: handedOver + abandoned + sum(lines.map((l) => l.backToQueue)),
     handedOver,
-    waitingTimeMs: sum(lines.map((l) => l.pickedUpWaitingTimeMs)),
+    waited: handedOver + abandoned,
+    waitingTimeMs: sum(lines.map((l) => l.waitingTimeMs)),
+    pickedUpAfterBuzz: sum(lines.map((l) => l.pickedUpAfterBuzz)),
+    pickupTimeMs: sum(lines.map((l) => l.pickupTimeMs)),
   };
 }
 
-const NO_PLATES: Plates = { made: 0, handedOver: 0, waitingTimeMs: 0 };
+function platesFrom(of: (key: keyof Plates) => number): Plates {
+  return {
+    made: of("made"),
+    handedOver: of("handedOver"),
+    waited: of("waited"),
+    waitingTimeMs: of("waitingTimeMs"),
+    pickedUpAfterBuzz: of("pickedUpAfterBuzz"),
+    pickupTimeMs: of("pickupTimeMs"),
+  };
+}
+
+const NO_PLATES: Plates = platesFrom(() => 0);
 
 /** The plates of a product counted between two states of the log. */
 function platesBetween(before: State, after: State, productId: string): Plates {
   const start = platesOf(before, productId);
   const end = platesOf(after, productId);
-  return {
-    made: end.made - start.made,
-    handedOver: end.handedOver - start.handedOver,
-    waitingTimeMs: end.waitingTimeMs - start.waitingTimeMs,
-  };
+  return platesFrom((key) => end[key] - start[key]);
 }
 
 function addPlates(plates: readonly Plates[]): Plates {
-  return {
-    made: sum(plates.map((p) => p.made)),
-    handedOver: sum(plates.map((p) => p.handedOver)),
-    waitingTimeMs: sum(plates.map((p) => p.waitingTimeMs)),
-  };
+  return platesFrom((key) => sum(plates.map((p) => p[key])));
 }
 
 function countsRow(
@@ -378,22 +406,38 @@ function countsRow(
   return { productId, label, made: plates.made, ...cellOf(plates) };
 }
 
-function cellOf({ handedOver, waitingTimeMs }: Plates): ComparisonCell {
-  return handedOver === 0
-    ? { handedOver }
-    : {
-        handedOver,
-        averageWaitingTimeMs:
-          Math.round(waitingTimeMs / handedOver / 1000) * 1000,
-      };
+function cellOf(plates: Plates): ComparisonCell {
+  return {
+    handedOver: plates.handedOver,
+    ...(plates.waited === 0
+      ? {}
+      : {
+          averageWaitingTimeMs: averageMs(plates.waitingTimeMs, plates.waited),
+        }),
+    ...(plates.pickedUpAfterBuzz === 0
+      ? {}
+      : {
+          averagePickupTimeMs: averageMs(
+            plates.pickupTimeMs,
+            plates.pickedUpAfterBuzz,
+          ),
+        }),
+  };
+}
+
+/** Rounded to whole seconds. */
+function averageMs(totalMs: number, count: number): number {
+  return Math.round(totalMs / count / 1000) * 1000;
 }
 
 export type ComparisonBy = "crew" | "shift";
 
 export interface ComparisonCell {
   readonly handedOver: number;
-  /** Over every picked-up plate, rounded to whole seconds; absent if none was picked up. */
+  /** Over every picked-up or abandoned plate, rounded to whole seconds; absent if none. */
   readonly averageWaitingTimeMs?: number;
+  /** Over every plate picked up after a buzz, rounded to whole seconds; absent if none. */
+  readonly averagePickupTimeMs?: number;
 }
 
 export interface ComparisonColumn {
@@ -416,7 +460,7 @@ export interface Comparison {
   readonly totals: readonly ComparisonCell[];
 }
 
-/** The shifts, or the crews, side by side: plates handed over and the average waiting time. */
+/** The shifts, or the crews, side by side: plates handed over, the average waiting and pickup time. */
 export function shiftComparison(state: State, by: ComparisonBy): Comparison {
   const shifts = kirbeShifts(state);
   const shares = shiftShares(state.live, shifts);
@@ -553,10 +597,6 @@ export function waitingPlates(
       waiting: sum(queueFor(state, id).map(({ line }) => waitingOf(line))),
     }),
   );
-}
-
-function sum(values: readonly number[]): number {
-  return values.reduce((a, b) => a + b, 0);
 }
 
 /**

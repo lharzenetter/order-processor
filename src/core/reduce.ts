@@ -157,14 +157,23 @@ function handOver(
       return line;
     }
     checkCount(plate.count, line.buzzed + waitingOf(line));
-    // Buzzed plates go first; any rest comes from the waiting ones.
+    // Buzzed plates go first, oldest first; any rest comes from the waiting ones, whose waiting
+    // time ends now and who have no pickup time.
     const fromBuzzed = Math.min(plate.count, line.buzzed);
+    const buzzedAt = line.buzzedAt.slice(0, fromBuzzed);
+    const fromWaiting = plate.count - fromBuzzed;
     const handed: Line = {
       ...line,
+      buzzedAt: line.buzzedAt.slice(fromBuzzed),
       pickedUp: line.pickedUp + plate.count,
-      pickedUpWaitingTimeMs:
-        line.pickedUpWaitingTimeMs +
-        plate.count * waitingTimeMs(order, event.at),
+      pickedUpAfterBuzz: line.pickedUpAfterBuzz + fromBuzzed,
+      waitingTimeMs:
+        line.waitingTimeMs +
+        sum(buzzedAt.map((at) => waitingTimeMs(order, at))) +
+        fromWaiting * waitingTimeMs(order, event.at),
+      pickupTimeMs:
+        line.pickupTimeMs +
+        sum(buzzedAt.map((at) => pickupTimeMs(at, event.at))),
     };
     return fromBuzzed === line.buzzed
       ? withoutClock({ ...handed, buzzed: 0 })
@@ -200,6 +209,10 @@ function abandonOrder(
         cancelled: line.cancelled + waitingOf(line),
         abandoned: line.abandoned + line.buzzed,
         buzzed: 0,
+        buzzedAt: [],
+        waitingTimeMs:
+          line.waitingTimeMs +
+          sum(line.buzzedAt.map((at) => waitingTimeMs(order, at))),
       }),
     ),
   };
@@ -293,6 +306,15 @@ export function waitingTimeMs(order: Order, at: number): number {
   return Math.max(0, at - order.takenAt);
 }
 
+/** From a plate's buzz to `at`; never below 0, for the same reason. */
+export function pickupTimeMs(buzzedAt: number, at: number): number {
+  return Math.max(0, at - buzzedAt);
+}
+
+export function sum(values: readonly number[]): number {
+  return values.reduce((a, b) => a + b, 0);
+}
+
 export function isOpen(order: Order): boolean {
   return order.closedBy === undefined;
 }
@@ -303,8 +325,11 @@ function newLine(productId: string, ordered: number): Line {
     ordered,
     cancelled: 0,
     buzzed: 0,
+    buzzedAt: [],
     pickedUp: 0,
-    pickedUpWaitingTimeMs: 0,
+    pickedUpAfterBuzz: 0,
+    waitingTimeMs: 0,
+    pickupTimeMs: 0,
     backToQueue: 0,
     abandoned: 0,
   };
@@ -315,13 +340,19 @@ function buzz(line: Line, count: number, at: number): Line {
   return {
     ...line,
     buzzed: line.buzzed + count,
+    buzzedAt: [...line.buzzedAt, ...Array.from({ length: count }, () => at)],
     buzzClockFrom: line.buzzed === 0 ? at : (line.buzzClockFrom ?? at),
   };
 }
 
-// Takes one buzzed plate off the line; its clock clears once nothing is buzzed.
+// Takes one buzzed plate off the line, the oldest; its clock clears once nothing is buzzed.
 function unbuzz(line: Line, change: Partial<Line>): Line {
-  const next = { ...line, ...change, buzzed: line.buzzed - 1 };
+  const next = {
+    ...line,
+    ...change,
+    buzzed: line.buzzed - 1,
+    buzzedAt: line.buzzedAt.slice(1),
+  };
   return next.buzzed === 0 ? withoutClock(next) : next;
 }
 

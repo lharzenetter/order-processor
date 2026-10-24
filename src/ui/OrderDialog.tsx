@@ -62,8 +62,7 @@ export function OrderDialog({
           <span className={styles.headingText}>
             Pager {view.pager}
             <small className={shared.muted}>
-              bestellt um {formatClock(view.takenAt)} · Wartezeit{" "}
-              {formatSince(view.waitingTimeMs)} · {buzzed} von {open}{" "}
+              bestellt um {formatClock(view.takenAt)} · {buzzed} von {open}{" "}
               {open === 1 ? "Teller" : "Tellern"} gerufen
             </small>
           </span>
@@ -228,14 +227,15 @@ function OrderLines({
                         line.rebuzzDue === true && styles.overdue,
                       )}
                     >
-                      · seit {formatSince(line.sinceBuzzMs ?? 0)}
+                      · Abholzeit {formatSince(line.pickupTimeMs ?? 0)}
                     </span>
                   </>
                 )}
                 {line.buzzed > 0 && line.waiting > 0 && " · "}
                 {line.waiting > 0 && (
                   <span className={shared.muted}>
-                    {line.waiting} wartet noch auf die Küche
+                    {line.waiting} wartet noch auf die Küche · Wartezeit{" "}
+                    {formatSince(line.waitingTimeMs ?? 0)}
                   </span>
                 )}
               </span>

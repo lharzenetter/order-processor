@@ -44,7 +44,6 @@ describe("the order popup", () => {
       orderId: order.id,
       pager: 7,
       takenAt: order.at,
-      waitingTimeMs: 65_000,
       open: true,
       lines: [
         {
@@ -53,6 +52,7 @@ describe("the order popup", () => {
           buzzed: 0,
           waiting: 1,
           soldOut: false,
+          waitingTimeMs: 65_000,
         },
         {
           productId: "braten",
@@ -60,8 +60,10 @@ describe("the order popup", () => {
           buzzed: 1,
           waiting: 1,
           soldOut: false,
+          waitingTimeMs: 65_000,
           sinceBuzzMs: 65_000,
           rebuzzDue: false,
+          pickupTimeMs: 65_000,
         },
       ],
     });

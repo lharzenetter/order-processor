@@ -7,9 +7,15 @@ export interface Line {
   readonly cancelled: number;
   /** Buzzed and not yet picked up. */
   readonly buzzed: number;
+  /** When each buzzed plate was buzzed or handed on to this line, oldest first. */
+  readonly buzzedAt: readonly number[];
   readonly pickedUp: number;
-  /** The waiting times of the picked-up plates, summed. */
-  readonly pickedUpWaitingTimeMs: number;
+  /** Of the picked-up plates, those buzzed before their handover. */
+  readonly pickedUpAfterBuzz: number;
+  /** The waiting times of the picked-up and abandoned plates, summed. */
+  readonly waitingTimeMs: number;
+  /** The pickup times of the plates picked up after a buzz, summed. */
+  readonly pickupTimeMs: number;
   readonly backToQueue: number;
   readonly abandoned: number;
   /** Set while `buzzed > 0`: when the line's buzz clock started or was last re-buzzed. */
