@@ -21,12 +21,17 @@ export {
   orderView,
   pagerCheck,
   pagerOverview,
+  shiftComparison,
   soldOutWaiting,
   waitingPlates,
 } from "./selectors";
 export type {
   BoardRow,
   BuzzedLine,
+  Comparison,
+  ComparisonBy,
+  ComparisonCell,
+  ComparisonColumn,
   EvaluationRow,
   OpenOrdersListEntry,
   OrderView,

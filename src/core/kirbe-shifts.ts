@@ -37,7 +37,10 @@ type PlannedOnCalendar = Omit<Shift, "countsFromAt" | "countsUntilAt">;
 export interface Shift {
   /** "sa-a": stable, for the ui to remember a choice. */
   readonly id: string;
+  /** "Sa A". */
   readonly label: string;
+  /** "Sa". */
+  readonly dayLabel: string;
   readonly crew: string;
   readonly day: KirbeDay;
   readonly startAt: number;
@@ -65,6 +68,7 @@ export function kirbeShifts(state: State): readonly Shift[] {
     const base = {
       id: `${DAY_SHORT[shift.day].toLowerCase()}-${shift.crew.toLowerCase()}`,
       label: `${DAY_SHORT[shift.day]} ${shift.crew}`,
+      dayLabel: DAY_SHORT[shift.day],
       crew: shift.crew,
       day: shift.day,
       startAt,

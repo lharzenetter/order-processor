@@ -134,4 +134,31 @@ test.describe("the Auswertung per Schicht", () => {
     await expect(saA).toHaveAttribute("aria-pressed", "true");
     await expect(gesamt).toHaveAttribute("aria-pressed", "false");
   });
+
+  test("compares the crews, or the shifts one figure at a time", async ({
+    page,
+  }, testInfo) => {
+    await page.clock.setFixedTime(new Date("2026-10-24T14:30:00+02:00"));
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await openApp(page);
+    await takeOrder(page, { Pommes: 1 }, 4);
+    await page.getByRole("button", { name: "Verwaltung" }).click();
+    await page.getByRole("button", { name: "Auswertung" }).click();
+    const auswertung = page.getByRole("region", { name: "Auswertung" });
+    await auswertung.getByRole("button", { name: "Vergleich" }).click();
+    await expect(
+      auswertung.getByRole("columnheader", { name: /^Gruppe A/ }),
+    ).toContainText("Sa 10:00–15:00");
+    await page.screenshot({ path: testInfo.outputPath("nach-gruppe.png") });
+
+    await auswertung.getByRole("button", { name: "nach Schicht" }).click();
+    await expect(
+      auswertung.getByRole("columnheader", { name: "Mo A" }),
+    ).toBeVisible();
+    await auswertung.getByRole("button", { name: "Ø Wartezeit" }).click();
+    await expect(
+      auswertung.getByRole("button", { name: "Ø Wartezeit" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.screenshot({ path: testInfo.outputPath("nach-schicht.png") });
+  });
 });

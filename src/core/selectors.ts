@@ -3,7 +3,8 @@ import { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
 import type { Event } from "./event";
 import { kirbeShifts, shiftRange } from "./kirbe-shifts";
 import type { Shift } from "./kirbe-shifts";
-import { fold, isOpen, waitingOf, waitingTimeMs } from "./reduce";
+import { fold, isOpen, reduce, waitingOf, waitingTimeMs } from "./reduce";
+import { INITIAL_STATE } from "./state";
 import type { ClosedBy, Line, Order, State } from "./state";
 
 /** An order queued for a product, as a pager chip shows it. */
@@ -313,8 +314,6 @@ function shiftEvaluationRows(
   const before = fold(live.slice(0, from));
   const after = fold(live.slice(0, until));
   return MENU.map(({ id, label }) => {
-    const start = platesOf(before, id);
-    const end = platesOf(after, id);
     const mark = live
       .slice(from, until)
       .find((e) => e.type === "soldOutMarked" && e.productId === id);
@@ -322,11 +321,7 @@ function shiftEvaluationRows(
       ? shiftOfLastMark(live, from, id, shifts)?.label
       : undefined;
     return {
-      ...countsRow(id, label, {
-        made: end.made - start.made,
-        handedOver: end.handedOver - start.handedOver,
-        waitingTimeMs: end.waitingTimeMs - start.waitingTimeMs,
-      }),
+      ...countsRow(id, label, platesBetween(before, after, id)),
       ...(mark === undefined ? {} : { soldOutFirstAt: mark.at }),
       ...(soldOutSince === undefined ? {} : { soldOutSince }),
       soldOutCleared:
@@ -354,19 +349,137 @@ function platesOf(state: State, productId: string): Plates {
   };
 }
 
+const NO_PLATES: Plates = { made: 0, handedOver: 0, waitingTimeMs: 0 };
+
+/** The plates of a product counted between two states of the log. */
+function platesBetween(before: State, after: State, productId: string): Plates {
+  const start = platesOf(before, productId);
+  const end = platesOf(after, productId);
+  return {
+    made: end.made - start.made,
+    handedOver: end.handedOver - start.handedOver,
+    waitingTimeMs: end.waitingTimeMs - start.waitingTimeMs,
+  };
+}
+
+function addPlates(plates: readonly Plates[]): Plates {
+  return {
+    made: sum(plates.map((p) => p.made)),
+    handedOver: sum(plates.map((p) => p.handedOver)),
+    waitingTimeMs: sum(plates.map((p) => p.waitingTimeMs)),
+  };
+}
+
 function countsRow(
   productId: string,
   label: string,
-  { made, handedOver, waitingTimeMs }: Plates,
+  plates: Plates,
 ): Omit<EvaluationRow, "soldOutCleared"> {
-  const counts = { productId, label, made, handedOver };
+  return { productId, label, made: plates.made, ...cellOf(plates) };
+}
+
+function cellOf({ handedOver, waitingTimeMs }: Plates): ComparisonCell {
   return handedOver === 0
-    ? counts
+    ? { handedOver }
     : {
-        ...counts,
+        handedOver,
         averageWaitingTimeMs:
           Math.round(waitingTimeMs / handedOver / 1000) * 1000,
       };
+}
+
+export type ComparisonBy = "crew" | "shift";
+
+export interface ComparisonCell {
+  readonly handedOver: number;
+  /** Over every picked-up plate, rounded to whole seconds; absent if none was picked up. */
+  readonly averageWaitingTimeMs?: number;
+}
+
+export interface ComparisonColumn {
+  /** The shift's id, or the crew's letter in lower case. */
+  readonly id: string;
+  readonly label: string;
+  /** The shifts it sums: the one shift, or every shift of the crew, in calendar order. */
+  readonly shifts: readonly Shift[];
+}
+
+export interface Comparison {
+  readonly columns: readonly ComparisonColumn[];
+  /** Per product in display order, one cell per column. */
+  readonly rows: readonly {
+    readonly productId: string;
+    readonly label: string;
+    readonly cells: readonly ComparisonCell[];
+  }[];
+  /** Every product together, one cell per column. */
+  readonly totals: readonly ComparisonCell[];
+}
+
+/** The shifts, or the crews, side by side: plates handed over and the average waiting time. */
+export function shiftComparison(state: State, by: ComparisonBy): Comparison {
+  const shifts = kirbeShifts(state);
+  const shares = shiftShares(state.live, shifts);
+  const columns =
+    by === "shift"
+      ? shifts.map((shift) => ({
+          id: shift.id,
+          label: shift.label,
+          shifts: [shift],
+        }))
+      : [...new Set(shifts.map((shift) => shift.crew))].sort().map((crew) => ({
+          id: crew.toLowerCase(),
+          label: `Gruppe ${crew}`,
+          shifts: shifts.filter((shift) => shift.crew === crew),
+        }));
+  function platesIn(
+    column: ComparisonColumn,
+    productIds: readonly string[],
+  ): Plates {
+    return addPlates(
+      column.shifts.flatMap((shift) =>
+        productIds.map((id) => shares.get(shift.id)?.get(id) ?? NO_PLATES),
+      ),
+    );
+  }
+  return {
+    columns,
+    rows: MENU.map(({ id, label }) => ({
+      productId: id,
+      label,
+      cells: columns.map((column) => cellOf(platesIn(column, [id]))),
+    })),
+    totals: columns.map((column) =>
+      cellOf(
+        platesIn(
+          column,
+          MENU.map(({ id }) => id),
+        ),
+      ),
+    ),
+  };
+}
+
+/** Per shift id, per product id, the shift's share of the plates, folding the log only once. */
+function shiftShares(
+  live: readonly Event[],
+  shifts: readonly Shift[],
+): ReadonlyMap<string, ReadonlyMap<string, Plates>> {
+  const shares = new Map<string, ReadonlyMap<string, Plates>>();
+  let before = INITIAL_STATE;
+  let done = 0;
+  // The ranges follow on from each other, so each shift folds on from the one before.
+  for (const shift of shifts) {
+    const { until } = shiftRange(live, shift);
+    const after = live.slice(done, until).reduce(reduce, before);
+    shares.set(
+      shift.id,
+      new Map(MENU.map(({ id }) => [id, platesBetween(before, after, id)])),
+    );
+    before = after;
+    done = until;
+  }
+  return shares;
 }
 
 /** The shift of the last `soldOutMarked` for the product among the first `count` live events. */

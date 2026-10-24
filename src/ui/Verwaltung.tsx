@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   evaluationRows,
   headerCounts,
   kirbeShifts,
   openOrdersList,
+  shiftComparison,
 } from "../core/index";
-import type { Shift, State } from "../core/index";
+import type {
+  Comparison,
+  ComparisonBy,
+  ComparisonCell,
+  Shift,
+  State,
+} from "../core/index";
 import { ImportRejectedError } from "../storage/index";
 import type { ReplaceResult } from "../storage/index";
 import { cx } from "./cx";
@@ -129,6 +136,7 @@ export function Verwaltung({
     return (
       <Overlay
         title={view === "auswertung" ? "Auswertung" : "Offene Bestellungen"}
+        wide={view === "auswertung"}
         onBack={() => {
           setView("main");
         }}
@@ -436,10 +444,12 @@ export function Verwaltung({
 function Overlay({
   title,
   onBack,
+  wide = false,
   children,
 }: {
   title: string;
   onBack?: () => void;
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -452,7 +462,7 @@ function Overlay({
         )}
         <h1 className={styles.title}>{title}</h1>
       </div>
-      <div className={styles.body}>{children}</div>
+      <div className={cx(styles.body, wide && styles.wide)}>{children}</div>
     </div>
   );
 }
@@ -467,74 +477,285 @@ function HealthLine({ ok, children }: { ok: boolean; children: ReactNode }) {
 }
 
 function Auswertung({ state }: { state: State }) {
-  const [shiftId, setShiftId] = useState<string | null>(null);
+  // "gesamt", "vergleich" or a shift's id.
+  const [choice, setChoice] = useState("gesamt");
   const shifts = kirbeShifts(state);
   // A replaced log may have no shifts any more; fall back to the whole Kirbe.
-  const shown = shifts.find((shift) => shift.id === shiftId);
+  const comparing = choice === "vergleich" && shifts.length > 0;
+  const shown = shifts.find((shift) => shift.id === choice);
   return (
     <>
-      <div className={styles.shifts}>
-        <button
-          type="button"
-          aria-pressed={shown === undefined}
-          className={cx(styles.shift, shown === undefined && styles.chosen)}
-          onClick={() => {
-            setShiftId(null);
+      <div className={styles.choices}>
+        <Choice
+          chosen={!comparing && shown === undefined}
+          onChoose={() => {
+            setChoice("gesamt");
           }}
         >
           Gesamt
-        </button>
+        </Choice>
+        {shifts.length > 0 && (
+          <Choice
+            chosen={comparing}
+            onChoose={() => {
+              setChoice("vergleich");
+            }}
+          >
+            Vergleich
+          </Choice>
+        )}
         {shifts.map((shift) => (
-          <button
+          <Choice
             key={shift.id}
-            type="button"
-            aria-pressed={shift === shown}
-            className={cx(styles.shift, shift === shown && styles.chosen)}
-            onClick={() => {
-              setShiftId(shift.id);
+            chosen={shift === shown}
+            onChoose={() => {
+              setChoice(shift.id);
             }}
           >
             {shift.label}
             <span className={styles.sub}>{plannedTimes(shift)}</span>
-          </button>
+          </Choice>
         ))}
       </div>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th scope="col">Gericht</th>
-            <th scope="col">Gemacht</th>
-            <th scope="col">Ausgegeben</th>
-            <th scope="col">Ø Wartezeit</th>
-            <th scope="col">Ausverkauft um</th>
-          </tr>
-        </thead>
-        <tbody>
-          {evaluationRows(state, shown?.id).map((row) => (
-            <tr key={row.productId}>
-              <th scope="row">{row.label}</th>
-              <td>{row.made}</td>
-              <td>{row.handedOver}</td>
-              <td>
-                {row.averageWaitingTimeMs === undefined
-                  ? "–"
-                  : formatSince(row.averageWaitingTimeMs)}
-              </td>
-              <td>
-                {row.soldOutSince !== undefined && `seit ${row.soldOutSince}`}
-                {row.soldOutSince !== undefined &&
-                  row.soldOutFirstAt !== undefined &&
-                  ", "}
-                {row.soldOutFirstAt !== undefined &&
-                  formatClock(row.soldOutFirstAt)}
-                {row.soldOutCleared && " (wieder frei)"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {comparing ? (
+        <Vergleich state={state} />
+      ) : (
+        <EvaluationTable state={state} shift={shown} />
+      )}
     </>
   );
+}
+
+function Choice({
+  chosen,
+  onChoose,
+  children,
+}: {
+  chosen: boolean;
+  onChoose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={chosen}
+      className={cx(styles.choice, chosen && styles.chosen)}
+      onClick={onChoose}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EvaluationTable({
+  state,
+  shift,
+}: {
+  state: State;
+  shift: Shift | undefined;
+}) {
+  return (
+    <table className={styles.table}>
+      <thead>
+        <tr>
+          <th scope="col">Gericht</th>
+          <th scope="col">Gemacht</th>
+          <th scope="col">Ausgegeben</th>
+          <th scope="col">Ø Wartezeit</th>
+          <th scope="col">Ausverkauft um</th>
+        </tr>
+      </thead>
+      <tbody>
+        {evaluationRows(state, shift?.id).map((row) => (
+          <tr key={row.productId}>
+            <th scope="row">{row.label}</th>
+            <td>{row.made}</td>
+            <td>{row.handedOver}</td>
+            <td>{waitingText(row)}</td>
+            <td>
+              {row.soldOutSince !== undefined && `seit ${row.soldOutSince}`}
+              {row.soldOutSince !== undefined &&
+                row.soldOutFirstAt !== undefined &&
+                ", "}
+              {row.soldOutFirstAt !== undefined &&
+                formatClock(row.soldOutFirstAt)}
+              {row.soldOutCleared && " (wieder frei)"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function Vergleich({ state }: { state: State }) {
+  const [by, setBy] = useState<ComparisonBy>("crew");
+  // Nine shifts with two figures each are too wide for the iPad: one figure at a time.
+  const [figure, setFigure] = useState<"handedOver" | "waiting">("handedOver");
+  const comparison = shiftComparison(state, by);
+  return (
+    <>
+      <div className={styles.choices}>
+        <Choice
+          chosen={by === "crew"}
+          onChoose={() => {
+            setBy("crew");
+          }}
+        >
+          nach Gruppe
+        </Choice>
+        <Choice
+          chosen={by === "shift"}
+          onChoose={() => {
+            setBy("shift");
+          }}
+        >
+          nach Schicht
+        </Choice>
+        {by === "shift" && (
+          <>
+            <span className={styles.gap} />
+            <Choice
+              chosen={figure === "handedOver"}
+              onChoose={() => {
+                setFigure("handedOver");
+              }}
+            >
+              Ausgegeben
+            </Choice>
+            <Choice
+              chosen={figure === "waiting"}
+              onChoose={() => {
+                setFigure("waiting");
+              }}
+            >
+              Ø Wartezeit
+            </Choice>
+          </>
+        )}
+      </div>
+      {by === "crew" ? (
+        <CrewTable comparison={comparison} />
+      ) : (
+        <ShiftTable comparison={comparison} figure={figure} />
+      )}
+    </>
+  );
+}
+
+function CrewTable({ comparison }: { comparison: Comparison }) {
+  return (
+    <table className={cx(styles.table, styles.comparison)}>
+      <thead>
+        <tr>
+          <th scope="col" rowSpan={2}>
+            Gericht
+          </th>
+          {comparison.columns.map((column) => (
+            <th
+              key={column.id}
+              scope="colgroup"
+              colSpan={2}
+              className={styles.crewStart}
+            >
+              {column.label}
+              {column.shifts.map((shift) => (
+                <span key={shift.id} className={styles.sub}>
+                  {shift.dayLabel} {plannedTimes(shift)}
+                </span>
+              ))}
+            </th>
+          ))}
+        </tr>
+        <tr>
+          {comparison.columns.map((column) => (
+            <Fragment key={column.id}>
+              <th scope="col" className={styles.crewStart}>
+                Ausgegeben
+              </th>
+              <th scope="col">Ø Wartezeit</th>
+            </Fragment>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {comparison.rows.map((row) => (
+          <tr key={row.productId}>
+            <th scope="row">{row.label}</th>
+            {row.cells.map((cell, i) => (
+              <Fragment key={comparison.columns[i]?.id}>
+                <td className={styles.crewStart}>{cell.handedOver}</td>
+                <td>{waitingText(cell)}</td>
+              </Fragment>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">Gesamt</th>
+          {comparison.totals.map((cell, i) => (
+            <Fragment key={comparison.columns[i]?.id}>
+              <td className={styles.crewStart}>{cell.handedOver}</td>
+              <td>{waitingText(cell)}</td>
+            </Fragment>
+          ))}
+        </tr>
+      </tfoot>
+    </table>
+  );
+}
+
+function ShiftTable({
+  comparison,
+  figure,
+}: {
+  comparison: Comparison;
+  figure: "handedOver" | "waiting";
+}) {
+  function text(cell: ComparisonCell): string {
+    return figure === "handedOver"
+      ? String(cell.handedOver)
+      : waitingText(cell);
+  }
+  return (
+    <table className={styles.table}>
+      <thead>
+        <tr>
+          <th scope="col">Gericht</th>
+          {comparison.columns.map((column) => (
+            <th key={column.id} scope="col">
+              {column.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {comparison.rows.map((row) => (
+          <tr key={row.productId}>
+            <th scope="row">{row.label}</th>
+            {row.cells.map((cell, i) => (
+              <td key={comparison.columns[i]?.id}>{text(cell)}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">Gesamt</th>
+          {comparison.totals.map((cell, i) => (
+            <td key={comparison.columns[i]?.id}>{text(cell)}</td>
+          ))}
+        </tr>
+      </tfoot>
+    </table>
+  );
+}
+
+function waitingText(cell: ComparisonCell): string {
+  return cell.averageWaitingTimeMs === undefined
+    ? "–"
+    : formatSince(cell.averageWaitingTimeMs);
 }
 
 /** "10:00–15:00", or "ab 19:00" where the plan says Ende. */
