@@ -1,6 +1,9 @@
 import { MENU } from "./menu";
 import { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
-import { isOpen, waitingOf, waitingTimeMs } from "./reduce";
+import type { Event } from "./event";
+import { kirbeShifts, shiftRange } from "./kirbe-shifts";
+import type { Shift } from "./kirbe-shifts";
+import { fold, isOpen, waitingOf, waitingTimeMs } from "./reduce";
 import type { ClosedBy, Line, Order, State } from "./state";
 
 /** An order queued for a product, as a pager chip shows it. */
@@ -265,42 +268,121 @@ export interface EvaluationRow {
   readonly handedOver: number;
   /** Over every picked-up plate, rounded to whole seconds; absent if none was picked up. */
   readonly averageWaitingTimeMs?: number;
-  /** When the first live `soldOutMarked` happened; absent if never. */
+  /** When the first live `soldOutMarked` happened, within the shift for one; absent if never. */
   readonly soldOutFirstAt?: number;
-  /** Sold out at some point, but not any more. */
+  /** For one shift: sold out since an earlier shift, as that shift's label. */
+  readonly soldOutSince?: string;
+  /** Sold out at some point, but not any more; for one shift, at its end. */
   readonly soldOutCleared: boolean;
 }
 
-/** The Auswertung, per product in display order. */
-export function evaluationRows(state: State): readonly EvaluationRow[] {
+/**
+ * The Auswertung, per product in display order: of the whole Kirbe, or of the shift with
+ * `shiftId`, counting each plate in the shift where it was handed over, sent back or abandoned.
+ */
+export function evaluationRows(
+  state: State,
+  shiftId?: string,
+): readonly EvaluationRow[] {
+  if (shiftId !== undefined) {
+    return shiftEvaluationRows(state, shiftId);
+  }
   return MENU.map(({ id, label }) => {
-    const lines = state.orders.flatMap((order) =>
-      order.lines.filter((line) => line.productId === id),
-    );
-    const handedOver = sum(lines.map((l) => l.pickedUp));
-    const counts = {
-      productId: id,
-      label,
-      made: handedOver + sum(lines.map((l) => l.abandoned + l.backToQueue)),
-      handedOver,
-    };
-    const totalWaitingTimeMs = sum(lines.map((l) => l.pickedUpWaitingTimeMs));
-    const row =
-      handedOver === 0
-        ? counts
-        : {
-            ...counts,
-            averageWaitingTimeMs:
-              Math.round(totalWaitingTimeMs / handedOver / 1000) * 1000,
-          };
     const soldOutFirstAt = state.soldOutFirstAt[id];
-    return soldOutFirstAt === undefined
-      ? { ...row, soldOutCleared: false }
-      : {
-          ...row,
-          soldOutFirstAt,
-          soldOutCleared: !state.soldOut.includes(id),
-        };
+    return {
+      ...countsRow(id, label, platesOf(state, id)),
+      ...(soldOutFirstAt === undefined ? {} : { soldOutFirstAt }),
+      soldOutCleared:
+        soldOutFirstAt !== undefined && !state.soldOut.includes(id),
+    };
+  });
+}
+
+function shiftEvaluationRows(
+  state: State,
+  shiftId: string,
+): readonly EvaluationRow[] {
+  const shifts = kirbeShifts(state);
+  const shift = shifts.find((s) => s.id === shiftId);
+  if (shift === undefined) {
+    throw new Error(`No shift ${shiftId}`);
+  }
+  const { live } = state;
+  const { from, until } = shiftRange(live, shift);
+  // Every count only grows, so a shift's share is the difference between its two ends.
+  const before = fold(live.slice(0, from));
+  const after = fold(live.slice(0, until));
+  return MENU.map(({ id, label }) => {
+    const start = platesOf(before, id);
+    const end = platesOf(after, id);
+    const mark = live
+      .slice(from, until)
+      .find((e) => e.type === "soldOutMarked" && e.productId === id);
+    const soldOutSince = before.soldOut.includes(id)
+      ? shiftOfLastMark(live, from, id, shifts)?.label
+      : undefined;
+    return {
+      ...countsRow(id, label, {
+        made: end.made - start.made,
+        handedOver: end.handedOver - start.handedOver,
+        waitingTimeMs: end.waitingTimeMs - start.waitingTimeMs,
+      }),
+      ...(mark === undefined ? {} : { soldOutFirstAt: mark.at }),
+      ...(soldOutSince === undefined ? {} : { soldOutSince }),
+      soldOutCleared:
+        (mark !== undefined || soldOutSince !== undefined) &&
+        !after.soldOut.includes(id),
+    };
+  });
+}
+
+interface Plates {
+  readonly made: number;
+  readonly handedOver: number;
+  readonly waitingTimeMs: number;
+}
+
+function platesOf(state: State, productId: string): Plates {
+  const lines = state.orders.flatMap((order) =>
+    order.lines.filter((line) => line.productId === productId),
+  );
+  const handedOver = sum(lines.map((l) => l.pickedUp));
+  return {
+    made: handedOver + sum(lines.map((l) => l.abandoned + l.backToQueue)),
+    handedOver,
+    waitingTimeMs: sum(lines.map((l) => l.pickedUpWaitingTimeMs)),
+  };
+}
+
+function countsRow(
+  productId: string,
+  label: string,
+  { made, handedOver, waitingTimeMs }: Plates,
+): Omit<EvaluationRow, "soldOutCleared"> {
+  const counts = { productId, label, made, handedOver };
+  return handedOver === 0
+    ? counts
+    : {
+        ...counts,
+        averageWaitingTimeMs:
+          Math.round(waitingTimeMs / handedOver / 1000) * 1000,
+      };
+}
+
+/** The shift of the last `soldOutMarked` for the product among the first `count` live events. */
+function shiftOfLastMark(
+  live: readonly Event[],
+  count: number,
+  productId: string,
+  shifts: readonly Shift[],
+): Shift | undefined {
+  const index = live
+    .slice(0, count)
+    .map((e) => e.type === "soldOutMarked" && e.productId === productId)
+    .lastIndexOf(true);
+  return shifts.find((shift) => {
+    const { from, until } = shiftRange(live, shift);
+    return index >= from && index < until;
   });
 }
 

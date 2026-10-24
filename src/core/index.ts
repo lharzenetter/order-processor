@@ -4,6 +4,8 @@ export type { Event, EventBody, EventType, PlateCount, Stamp } from "./event";
 export { MENU } from "./menu";
 export type { Product } from "./menu";
 export { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
+export { kirbeShifts } from "./kirbe-shifts";
+export type { Shift } from "./kirbe-shifts";
 export { fold, reduce } from "./reduce";
 export {
   acceptsIntake,
@@ -35,5 +37,6 @@ export type {
   SoldOutWaiting,
   WaitingPlatesRow,
 } from "./selectors";
+export type { KirbeDay } from "./shifts";
 export { INITIAL_STATE } from "./state";
 export type { ClosedBy, Line, Order, State } from "./state";

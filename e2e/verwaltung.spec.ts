@@ -109,3 +109,29 @@ test("Nach Updates suchen reports when it can't check", async ({ page }) => {
     verwaltung.getByRole("button", { name: "Nach Updates suchen" }),
   ).toBeEnabled();
 });
+
+test.describe("the Auswertung per Schicht", () => {
+  test.use({ timezoneId: "Europe/Berlin" });
+
+  test("switches the table between the whole Kirbe and one shift", async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(new Date("2026-10-24T14:30:00+02:00"));
+    await openApp(page);
+    await takeOrder(page, { Pommes: 1 }, 4);
+    await page.getByRole("button", { name: "Verwaltung" }).click();
+    await page.getByRole("button", { name: "Auswertung" }).click();
+    const auswertung = page.getByRole("region", { name: "Auswertung" });
+    const gesamt = auswertung.getByRole("button", { name: "Gesamt" });
+    await expect(gesamt).toHaveAttribute("aria-pressed", "true");
+
+    const saA = auswertung.getByRole("button", { name: /^Sa A/ });
+    await expect(saA).toContainText("10:00–15:00");
+    await expect(
+      auswertung.getByRole("button", { name: /^Mo A/ }),
+    ).toContainText("ab 19:00");
+    await saA.click();
+    await expect(saA).toHaveAttribute("aria-pressed", "true");
+    await expect(gesamt).toHaveAttribute("aria-pressed", "false");
+  });
+});

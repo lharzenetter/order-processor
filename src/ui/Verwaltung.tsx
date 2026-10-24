@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { evaluationRows, headerCounts, openOrdersList } from "../core/index";
-import type { State } from "../core/index";
+import {
+  evaluationRows,
+  headerCounts,
+  kirbeShifts,
+  openOrdersList,
+} from "../core/index";
+import type { Shift, State } from "../core/index";
 import { ImportRejectedError } from "../storage/index";
 import type { ReplaceResult } from "../storage/index";
 import { cx } from "./cx";
@@ -462,38 +467,81 @@ function HealthLine({ ok, children }: { ok: boolean; children: ReactNode }) {
 }
 
 function Auswertung({ state }: { state: State }) {
+  const [shiftId, setShiftId] = useState<string | null>(null);
+  const shifts = kirbeShifts(state);
+  // A replaced log may have no shifts any more; fall back to the whole Kirbe.
+  const shown = shifts.find((shift) => shift.id === shiftId);
   return (
-    <table className={styles.table}>
-      <thead>
-        <tr>
-          <th scope="col">Gericht</th>
-          <th scope="col">Gemacht</th>
-          <th scope="col">Ausgegeben</th>
-          <th scope="col">Ø Wartezeit</th>
-          <th scope="col">Ausverkauft um</th>
-        </tr>
-      </thead>
-      <tbody>
-        {evaluationRows(state).map((row) => (
-          <tr key={row.productId}>
-            <th scope="row">{row.label}</th>
-            <td>{row.made}</td>
-            <td>{row.handedOver}</td>
-            <td>
-              {row.averageWaitingTimeMs === undefined
-                ? "–"
-                : formatSince(row.averageWaitingTimeMs)}
-            </td>
-            <td>
-              {row.soldOutFirstAt !== undefined &&
-                formatClock(row.soldOutFirstAt)}
-              {row.soldOutCleared && " (wieder frei)"}
-            </td>
-          </tr>
+    <>
+      <div className={styles.shifts}>
+        <button
+          type="button"
+          aria-pressed={shown === undefined}
+          className={cx(styles.shift, shown === undefined && styles.chosen)}
+          onClick={() => {
+            setShiftId(null);
+          }}
+        >
+          Gesamt
+        </button>
+        {shifts.map((shift) => (
+          <button
+            key={shift.id}
+            type="button"
+            aria-pressed={shift === shown}
+            className={cx(styles.shift, shift === shown && styles.chosen)}
+            onClick={() => {
+              setShiftId(shift.id);
+            }}
+          >
+            {shift.label}
+            <span className={styles.sub}>{plannedTimes(shift)}</span>
+          </button>
         ))}
-      </tbody>
-    </table>
+      </div>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th scope="col">Gericht</th>
+            <th scope="col">Gemacht</th>
+            <th scope="col">Ausgegeben</th>
+            <th scope="col">Ø Wartezeit</th>
+            <th scope="col">Ausverkauft um</th>
+          </tr>
+        </thead>
+        <tbody>
+          {evaluationRows(state, shown?.id).map((row) => (
+            <tr key={row.productId}>
+              <th scope="row">{row.label}</th>
+              <td>{row.made}</td>
+              <td>{row.handedOver}</td>
+              <td>
+                {row.averageWaitingTimeMs === undefined
+                  ? "–"
+                  : formatSince(row.averageWaitingTimeMs)}
+              </td>
+              <td>
+                {row.soldOutSince !== undefined && `seit ${row.soldOutSince}`}
+                {row.soldOutSince !== undefined &&
+                  row.soldOutFirstAt !== undefined &&
+                  ", "}
+                {row.soldOutFirstAt !== undefined &&
+                  formatClock(row.soldOutFirstAt)}
+                {row.soldOutCleared && " (wieder frei)"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
+}
+
+/** "10:00–15:00", or "ab 19:00" where the plan says Ende. */
+function plannedTimes(shift: Shift): string {
+  return shift.endAt === undefined
+    ? `ab ${formatClock(shift.startAt)}`
+    : `${formatClock(shift.startAt)}–${formatClock(shift.endAt)}`;
 }
 
 function OffeneBestellungen({ state }: { state: State }) {
