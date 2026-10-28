@@ -1,88 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  boardRows,
-  describeEvent,
-  fold,
-  openOrderByPager,
-  pagerOverview,
-  undoTarget,
-} from "./index";
+import { describeEvent, fold } from "./index";
 import type { EventBody } from "./index";
 import { testLog } from "./test-log";
 
 describe("Rückgängig", () => {
-  it("has nothing to undo on an empty log", () => {
-    expect(undoTarget(fold([]))).toBeNull();
-  });
-
-  it("targets the newest action and names it", () => {
-    const log = testLog();
-    const order = log.add({
-      type: "orderTaken",
-      pager: 7,
-      plates: [{ productId: "braten", count: 1 }],
-    });
-    const buzz = log.add({
-      type: "platesBuzzed",
-      orderId: order.id,
-      productId: "braten",
-      count: 1,
-    });
-    expect(undoTarget(fold(log.events))).toEqual({
-      event: buzz,
-      label: "Braten gerufen → Pager 7",
-    });
-  });
-
-  // 05-exceptions: one undo stack, newest first, no time limit
-  it("undoes repeatedly, newest first, without deleting anything", () => {
-    const log = testLog();
-    const order = log.add({
-      type: "orderTaken",
-      pager: 7,
-      plates: [{ productId: "braten", count: 2 }],
-    });
-    const buzz = log.add({
-      type: "platesBuzzed",
-      orderId: order.id,
-      productId: "braten",
-      count: 2,
-    });
-    log.add({ type: "actionUndone", targetId: buzz.id });
-    const afterOne = fold(log.events);
-    expect(boardRows(afterOne)[4]?.next).toMatchObject({
-      pager: 7,
-      waiting: 2,
-    });
-    expect(undoTarget(afterOne)?.event.id).toBe(order.id);
-
-    log.wait(24 * 60 * 60_000);
-    log.add({ type: "actionUndone", targetId: order.id });
-    const afterTwo = fold(log.events);
-    expect(openOrderByPager(afterTwo, 7)).toBeNull();
-    expect(undoTarget(afterTwo)).toBeNull();
-    expect(log.events).toHaveLength(4);
-  });
-
-  // server-sync 03: the label names the iPad the action came from, on every iPad
-  it("names the iPad the newest action came from", () => {
-    const log = testLog({ device: "iPad 2" });
-    const order = log.add({
-      type: "orderTaken",
-      pager: 12,
-      plates: [{ productId: "braten", count: 1 }],
-    });
-    log.add({
-      type: "platesBuzzed",
-      orderId: order.id,
-      productId: "braten",
-      count: 1,
-    });
-    expect(undoTarget(fold(log.events))?.label).toBe(
-      "Braten gerufen → Pager 12 (iPad 2)",
-    );
-  });
-
   it("refuses to undo anything but the current target", () => {
     const log = testLog();
     const first = log.add({ type: "pagerMarkedMissing", pager: 3 });
@@ -97,43 +18,6 @@ describe("Rückgängig", () => {
     const undo = log.add({ type: "actionUndone", targetId: missing.id });
     log.add({ type: "actionUndone", targetId: undo.id });
     expect(() => fold(log.events)).toThrow();
-  });
-
-  it("brings back a missing pager that an undone intake had restored", () => {
-    const log = testLog();
-    log.add({ type: "pagerMarkedMissing", pager: 23 });
-    const order = log.add({
-      type: "orderTaken",
-      pager: 23,
-      plates: [{ productId: "pommes", count: 1 }],
-    });
-    log.add({ type: "actionUndone", targetId: order.id });
-    expect(pagerOverview(fold(log.events)).missing).toEqual([23]);
-  });
-
-  // 10-event-catalog-and-core-state: strict stack, so the blocked undo is dropped
-  it("undoes a new order on a reused pager before the handover that freed it", () => {
-    const log = testLog();
-    const first = log.add({
-      type: "orderTaken",
-      pager: 7,
-      plates: [{ productId: "pommes", count: 1 }],
-    });
-    const handover = log.add({
-      type: "platesHandedOver",
-      orderId: first.id,
-      plates: [{ productId: "pommes", count: 1 }],
-    });
-    const second = log.add({
-      type: "orderTaken",
-      pager: 7,
-      plates: [{ productId: "braten", count: 1 }],
-    });
-    expect(undoTarget(fold(log.events))?.event.id).toBe(second.id);
-    log.add({ type: "actionUndone", targetId: second.id });
-    expect(undoTarget(fold(log.events))?.event.id).toBe(handover.id);
-    log.add({ type: "actionUndone", targetId: handover.id });
-    expect(openOrderByPager(fold(log.events), 7)?.id).toBe(first.id);
   });
 });
 

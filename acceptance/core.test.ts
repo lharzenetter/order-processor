@@ -5,6 +5,7 @@ import "./scenarios/handover";
 import "./scenarios/hand-on";
 import "./scenarios/cancel-and-sold-out";
 import "./scenarios/abandoned-order";
+import "./scenarios/undo";
 
 for (const { name, run } of scenarios()) {
   it(name, () => run(coreWindow()));
