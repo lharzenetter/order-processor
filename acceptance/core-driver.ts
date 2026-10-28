@@ -2,8 +2,10 @@ import {
   acceptsIntake,
   boardRows,
   buzzedLines,
+  evaluationRows,
   fold,
   handOnTarget,
+  kirbeShifts,
   labelOf,
   nextOrderFor,
   openOrderByPager,
@@ -11,25 +13,37 @@ import {
   orderView,
   pagerCheck,
   pagerOverview,
+  shiftComparison,
   soldOutWaiting,
   undoTarget,
 } from "../src/core";
 import type {
+  ComparisonCell,
   Event,
   EventBody,
+  EvaluationRow,
+  KirbeDay,
   Order,
   OrderViewLine,
   PlateCount,
   ProductId,
+  Shift,
   State,
 } from "../src/core";
 import type {
+  AverageSeen,
   BuzzedLineRef,
   BuzzedLineSeen,
+  ComparisonCellSeen,
+  CrewName,
   Duration,
+  EvaluationRowSeen,
+  KirbeDayName,
   LineSeen,
   OpenOrderSeen,
   Plates,
+  ShiftName,
+  SoldOutCellSeen,
   SoldOutOrderSeen,
   Steps,
   Window,
@@ -54,8 +68,169 @@ function clockOf(ms: number): string {
   return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// Samstag 10:00 comes with the evaluation scenarios (#20); until then any fixed instant will do.
-const START_AT = 1_760_000_000_000;
+// This Kirbe runs Samstag 24. to Montag 26. Oktober 2026, so its Sunday night has the end of summer
+// time, as the shift tests in the core have.
+const KIRBE_SATURDAY = { year: 2026, month: 10, day: 24 } as const;
+
+const DAY_OFFSET: Readonly<Record<KirbeDayName, number>> = {
+  Samstag: 0,
+  Sonntag: 1,
+  Montag: 2,
+};
+
+const CORE_DAY: Readonly<Record<KirbeDayName, KirbeDay>> = {
+  Samstag: "samstag",
+  Sonntag: "sonntag",
+  Montag: "montag",
+};
+
+const HOUR_MS = 60 * 60_000;
+
+// The Kirbe is in Berlin whatever the machine running the scenarios is set to.
+const BERLIN = new Intl.DateTimeFormat("de-DE", {
+  timeZone: "Europe/Berlin",
+  hourCycle: "h23",
+  weekday: "long",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function berlinParts(at: number): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    BERLIN.formatToParts(at).map((part) => [part.type, part.value]),
+  );
+}
+
+/** "11:30", as the Auswertung shows a time of day. */
+function berlinClock(at: number): string {
+  const { hour = "", minute = "" } = berlinParts(at);
+  return `${hour}:${minute}`;
+}
+
+/** "Samstag 11:30", as a scenario writes it. */
+function dayAndTimeOf(at: number): string {
+  return `${berlinParts(at).weekday ?? ""} ${berlinClock(at)}`;
+}
+
+function isKirbeDay(day: string): day is KirbeDayName {
+  return day in DAY_OFFSET;
+}
+
+/** The instant of "Samstag 11:30" on this Kirbe's calendar; refuses an hour that is not one. */
+function kirbeAt(dayAndTime: string): number {
+  const match = /^(Samstag|Sonntag|Montag) (\d{1,2}):(\d{2})$/.exec(dayAndTime);
+  const [, day, hour, minute] = match ?? [];
+  if (
+    day === undefined ||
+    !isKirbeDay(day) ||
+    hour === undefined ||
+    minute === undefined ||
+    Number(hour) > 23 ||
+    Number(minute) > 59
+  ) {
+    throw new Error(
+      `"${dayAndTime}" is no time on the Kirbe: write a Kirbe day and a time, as in "Samstag 11:30"`,
+    );
+  }
+  const offset = DAY_OFFSET[day];
+  // Berlin is two hours ahead in summer time and one in winter time; keep what reads back right.
+  const candidates = [2, 1]
+    .map(
+      (ahead) =>
+        Date.UTC(
+          KIRBE_SATURDAY.year,
+          KIRBE_SATURDAY.month - 1,
+          KIRBE_SATURDAY.day + offset,
+          Number(hour),
+          Number(minute),
+        ) -
+        ahead * HOUR_MS,
+    )
+    .filter(
+      (at) => dayAndTimeOf(at) === `${day} ${hour.padStart(2, "0")}:${minute}`,
+    );
+  const [at, twice] = candidates;
+  if (at === undefined) {
+    throw new Error(`"${dayAndTime}" never happens: the clocks skip that hour`);
+  }
+  if (twice !== undefined) {
+    throw new Error(
+      `"${dayAndTime}" happens twice: the clocks go back from 03:00 to 02:00 that night`,
+    );
+  }
+  return at;
+}
+
+// Every scenario starts when the Kirbe opens (#8).
+const START_AT = kirbeAt("Samstag 10:00");
+
+/** "Samstag · Gruppe A", as the Festbetrieb plan names a shift. */
+function shiftText({ day, crew }: ShiftName): string {
+  return `${day} · Gruppe ${crew}`;
+}
+
+/** An average as the Auswertung shows it: "m:ss", or "–". */
+function averageText(averageMs: number | undefined): string {
+  return averageMs === undefined ? "–" : clockOf(averageMs);
+}
+
+function wantedAverage(average: AverageSeen): string {
+  return average === "none" ? "–" : clockOf(msOf(average));
+}
+
+function quoted(text: string): string {
+  return text === "" ? "empty" : `"${text}"`;
+}
+
+/** One figure of a table, as staff read it, and what the scenario wants it to read. */
+interface Figure {
+  readonly column: string;
+  readonly shown: string;
+  readonly want: string | undefined;
+}
+
+/** Fails on the first figure that reads otherwise. */
+function expectFigures(where: string, figures: readonly Figure[]): void {
+  for (const { column, shown, want } of figures) {
+    if (want !== undefined && shown !== want) {
+      throw new Error(
+        `expected "${column}" ${where} to read ${quoted(want)}, but it reads ${quoted(shown)}`,
+      );
+    }
+  }
+}
+
+function cellFigures(
+  cell: ComparisonCell,
+  want: ComparisonCellSeen,
+): readonly Figure[] {
+  return [
+    {
+      column: "Ausgegeben",
+      shown: String(cell.handedOver),
+      want: want.handedOver === undefined ? undefined : String(want.handedOver),
+    },
+    {
+      column: "Ø Wartezeit",
+      shown: averageText(cell.averageWaitingTimeMs),
+      want:
+        want.waitingTime === undefined
+          ? undefined
+          : wantedAverage(want.waitingTime),
+    },
+    {
+      column: "Ø Abholzeit",
+      shown: averageText(cell.averagePickupTimeMs),
+      want:
+        want.pickupTime === undefined
+          ? undefined
+          : wantedAverage(want.pickupTime),
+    },
+  ];
+}
 
 /** Runs a scenario on `fold` and the selectors: the same reads the UI makes (#7). */
 export function coreWindow(): Window {
@@ -315,6 +490,128 @@ export function coreWindow(): Window {
     );
   }
 
+  function shiftOf(name: ShiftName): Shift {
+    const shifts = kirbeShifts(state);
+    const shift = shifts.find(
+      (s) => s.day === CORE_DAY[name.day] && s.crew === name.crew,
+    );
+    if (shift === undefined) {
+      throw new Error(
+        `the Auswertung offers no ${shiftText(name)}: ${
+          shifts.length === 0
+            ? "it shows no shifts before the first action"
+            : "the Festbetrieb plan has no such shift"
+        }`,
+      );
+    }
+    return shift;
+  }
+
+  function evaluationRow(
+    product: ProductId,
+    shift: ShiftName | undefined,
+  ): EvaluationRow {
+    const row = evaluationRows(
+      state,
+      shift === undefined ? undefined : shiftOf(shift).id,
+    ).find((r) => r.productId === product);
+    if (row === undefined) {
+      throw new Error(`the Auswertung has no row for ${labelOf(product)}`);
+    }
+    return row;
+  }
+
+  /** The "Ausverkauft um" cell as the Auswertung writes it. */
+  function soldOutText(row: EvaluationRow): string {
+    const since =
+      row.soldOutSince === undefined ? [] : [`seit ${row.soldOutSince}`];
+    const at =
+      row.soldOutFirstAt === undefined ? [] : [berlinClock(row.soldOutFirstAt)];
+    return `${[...since, ...at].join(", ")}${row.soldOutCleared ? " (wieder frei)" : ""}`;
+  }
+
+  function wantedSoldOut(soldOut: SoldOutCellSeen | "never"): string {
+    if (soldOut === "never") {
+      return "";
+    }
+    const { at, since, availableAgain = false } = soldOut;
+    const parts = [
+      ...(since === undefined ? [] : [`seit ${shiftOf(since).label}`]),
+      ...(at === undefined ? [] : [at]),
+    ];
+    return `${parts.join(", ")}${availableAgain ? " (wieder frei)" : ""}`;
+  }
+
+  function evaluationFigures(
+    row: EvaluationRow,
+    want: EvaluationRowSeen,
+  ): readonly Figure[] {
+    return [
+      {
+        column: "Gemacht",
+        shown: String(row.made),
+        want: want.made === undefined ? undefined : String(want.made),
+      },
+      ...cellFigures(row, want),
+      {
+        column: "Ausverkauft um",
+        shown: soldOutText(row),
+        want:
+          want.soldOut === undefined ? undefined : wantedSoldOut(want.soldOut),
+      },
+    ];
+  }
+
+  /** The Vergleich's cell for a product, or its "Gesamt" row, in a shift's or a crew's column. */
+  function comparisonCell(
+    column: ShiftName | CrewName,
+    product: ProductId | "total",
+  ): ComparisonCell {
+    const byShift = "day" in column;
+    const comparison = shiftComparison(state, byShift ? "shift" : "crew");
+    const label = byShift ? shiftOf(column).label : `Gruppe ${column.crew}`;
+    const index = comparison.columns.findIndex((c) => c.label === label);
+    const name = byShift ? shiftText(column) : label;
+    if (index === -1) {
+      throw new Error(`the Vergleich has no column for ${name}`);
+    }
+    const cells =
+      product === "total"
+        ? comparison.totals
+        : comparison.rows.find((r) => r.productId === product)?.cells;
+    const cell = cells?.[index];
+    if (cell === undefined) {
+      throw new Error(
+        `the Vergleich has no ${product === "total" ? "Gesamt row" : `row for ${labelOf(product)}`}`,
+      );
+    }
+    return cell;
+  }
+
+  /** The line's "Wartezeit" or "Abholzeit" in the order popup, as "m:ss". */
+  function expectLineTime(
+    pager: number,
+    product: ProductId,
+    which: "Wartezeit" | "Abholzeit",
+    want: Duration,
+  ): Promise<void> {
+    const line = linesOf(pager).find((l) => l.productId === product);
+    const shownMs =
+      which === "Wartezeit" ? line?.waitingTimeMs : line?.pickupTimeMs;
+    const what = `pager ${String(pager)}'s order to show ${which} ${clockOf(msOf(want))} for ${labelOf(product)}`;
+    if (shownMs === undefined) {
+      throw new Error(
+        `expected ${what}, but it shows none: ${
+          which === "Wartezeit" ? "no plate is waiting" : "no plate is buzzed"
+        }`,
+      );
+    }
+    if (clockOf(shownMs) !== clockOf(msOf(want))) {
+      throw new Error(`expected ${what}, but it shows ${clockOf(shownMs)}`);
+    }
+    return Promise.resolve();
+  }
+
   /** The steps on one iPad; every iPad acts on the same shared log. */
   function stepsOn(device: string | undefined): Steps {
     function append(body: EventBody): void {
@@ -525,6 +822,10 @@ export function coreWindow(): Window {
             }
             return Promise.resolve();
           },
+          showsWaitingTime: (product, waitingTime) =>
+            expectLineTime(pager, product, "Wartezeit", waitingTime),
+          showsPickupTime: (product, pickupTime) =>
+            expectLineTime(pager, product, "Abholzeit", pickupTime),
         };
       },
       pager(pager) {
@@ -750,10 +1051,67 @@ export function coreWindow(): Window {
           },
         };
       },
+      evaluation(shift) {
+        const where =
+          shift === undefined
+            ? "in the Auswertung (Gesamt)"
+            : `in the Auswertung of ${shiftText(shift)}`;
+        return {
+          row(product) {
+            return {
+              has(want) {
+                expectFigures(
+                  `for ${labelOf(product)} ${where}`,
+                  evaluationFigures(evaluationRow(product, shift), want),
+                );
+                return Promise.resolve();
+              },
+            };
+          },
+        };
+      },
+      comparison(column) {
+        const name =
+          "day" in column ? shiftText(column) : `Gruppe ${column.crew}`;
+        return {
+          row(product) {
+            return {
+              has(want) {
+                expectFigures(
+                  `for ${labelOf(product)} in the Vergleich's column ${name}`,
+                  cellFigures(comparisonCell(column, product), want),
+                );
+                return Promise.resolve();
+              },
+            };
+          },
+          total() {
+            return {
+              has(want) {
+                expectFigures(
+                  `for Gesamt in the Vergleich's column ${name}`,
+                  cellFigures(comparisonCell(column, "total"), want),
+                );
+                return Promise.resolve();
+              },
+            };
+          },
+        };
+      },
     },
     time: {
       passes(duration) {
         now += msOf(duration);
+        return Promise.resolve();
+      },
+      isNow(dayAndTime) {
+        const at = kirbeAt(dayAndTime);
+        if (at < now) {
+          throw new Error(
+            `time only moves forward: it is ${dayAndTimeOf(now)} already, past ${dayAndTime}`,
+          );
+        }
+        now = at;
         return Promise.resolve();
       },
     },
