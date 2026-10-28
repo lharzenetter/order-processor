@@ -21,6 +21,16 @@ export interface Staff {
   sendBackToQueue(line: { pager: number; product: ProductId }): Promise<void>;
   /** "Nochmal rufen" on the line in the buzzed list. */
   rebuzz(line: { pager: number; product: ProductId }): Promise<void>;
+  /** "1 … stornieren" in the order popup, tapped `count` times: waiting plates only. */
+  cancel(cancel: {
+    pager: number;
+    product: ProductId;
+    count: number;
+  }): Promise<void>;
+  /** Taps a product that is not sold out in the Ausverkauft markieren dialog. */
+  markSoldOut(product: ProductId): Promise<void>;
+  /** Taps a sold-out product in the Ausverkauft markieren dialog. */
+  clearSoldOut(product: ProductId): Promise<void>;
 }
 
 /** A span of time as staff read it on a clock, "m:ss"; compared exactly (#8). */
@@ -46,6 +56,8 @@ export interface OrderSeen {
   cannotHandOver(plates: Plates): Promise<void>;
   /** The order popup offers no "Weitergeben" for this product, or only disabled. */
   cannotHandOn(product: ProductId): Promise<void>;
+  /** The order popup offers no "1 … stornieren" for this product. */
+  cannotCancel(product: ProductId): Promise<void>;
 }
 
 export interface PagerSeen {
@@ -87,11 +99,44 @@ export interface BoardRowSeen {
   has(row: { next?: number; queued?: readonly number[] }): Promise<void>;
   /** The row reads "niemand wartet". */
   nobodyWaits(): Promise<void>;
+  /** The row carries the sold-out tag. */
+  isSoldOut(): Promise<void>;
+  isNotSoldOut(): Promise<void>;
+}
+
+/** An open order on a sold-out product's banner: its pager chip, "Pager N ×plates". */
+export interface SoldOutOrderSeen {
+  pager: number;
+  plates?: number;
+}
+
+/** A sold-out product's banner over the board. */
+export interface SoldOutSeen {
+  /** Exact and in FIFO order: the open orders still waiting for the product. */
+  lists(orders: readonly SoldOutOrderSeen[]): Promise<void>;
+  /** The banner reads "niemand wartet". */
+  nobodyWaits(): Promise<void>;
+}
+
+/** One entry of the Offene Bestellungen list: "Pager N: 2× Braten (1 gerufen), …". */
+export interface OpenOrderSeen {
+  pager: number;
+  /** Exact: every line still owed is named, and a count left out is none. */
+  lines: Partial<Readonly<Record<ProductId, LineSeen>>>;
+}
+
+/** The Offene Bestellungen list in the Verwaltung, the paper fallback. */
+export interface OpenOrdersListSeen {
+  /** Exact and sorted by pager: every open order. */
+  lists(orders: readonly OpenOrderSeen[]): Promise<void>;
 }
 
 export interface IntakeSeen {
   refusesPager(pager: number): Promise<void>;
   acceptsPager(pager: number): Promise<void>;
+  /** Tapping the product asks "… ist ausverkauft" before entering it. */
+  warnsSoldOut(product: ProductId): Promise<void>;
+  noSoldOutWarningFor(product: ProductId): Promise<void>;
 }
 
 /** What window staff see. Nothing here reaches past the screen (#7). */
@@ -101,6 +146,9 @@ export interface See {
   pager(pager: number): PagerSeen;
   buzzedList(): BuzzedListSeen;
   board(product: ProductId): BoardRowSeen;
+  /** The banner a sold-out product shows; fails if the product is not sold out. */
+  soldOut(product: ProductId): SoldOutSeen;
+  openOrdersList(): OpenOrdersListSeen;
   intake(): IntakeSeen;
 }
 

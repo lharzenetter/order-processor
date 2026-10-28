@@ -61,12 +61,4 @@ describe("the board (Übersicht)", () => {
     expect(nextOrderFor(state, "braten", first.id)?.pager).toBe(5);
     expect(nextOrderFor(state, "maultaschen")).toBeNull();
   });
-
-  it("marks a sold-out product's row", () => {
-    const log = testLog();
-    log.add({ type: "soldOutMarked", productId: "pommes" });
-    const state = fold(log.events);
-    expect(rowFor(state, "pommes").soldOut).toBe(true);
-    expect(rowFor(state, "braten").soldOut).toBe(false);
-  });
 });
