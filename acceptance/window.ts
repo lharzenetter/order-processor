@@ -31,6 +31,12 @@ export interface Staff {
   markSoldOut(product: ProductId): Promise<void>;
   /** Taps a sold-out product in the Ausverkauft markieren dialog. */
   clearSoldOut(product: ProductId): Promise<void>;
+  /** "Verwaiste Bestellung schließen…" in the order popup, then "Pager ist zurück" or "Pager fehlt". */
+  abandonOrder(abandon: { pager: number; pagerBack: boolean }): Promise<void>;
+  /** Taps a free pager in intake's "Pager fehlt…" mode. */
+  markPagerMissing(pager: number): Promise<void>;
+  /** Taps a missing (dashed) pager in intake's "Pager fehlt…" mode. */
+  restorePager(pager: number): Promise<void>;
 }
 
 /** A span of time as staff read it on a clock, "m:ss"; compared exactly (#8). */
@@ -63,6 +69,8 @@ export interface OrderSeen {
 export interface PagerSeen {
   isWithTheGuest(): Promise<void>;
   isFree(): Promise<void>;
+  /** The intake grid shows the pager dashed: "fehlt". */
+  isMissing(): Promise<void>;
 }
 
 /** One line of the buzzed list. */
