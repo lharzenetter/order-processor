@@ -49,7 +49,10 @@ export interface Staff extends Steps {
   ipad(deviceName: string): Steps;
 }
 
-/** A span of time as staff read it on a clock, "m:ss"; compared exactly (#8). */
+/**
+ * A span of time as staff read it on a clock, "m:ss" (#8). Compared exactly, but as the screen's
+ * whole seconds, since the screen drops part-seconds and a scenario can only state what it shows.
+ */
 export interface Duration {
   minutes?: number;
   seconds?: number;
@@ -103,7 +106,10 @@ export interface BuzzedLineRef {
 }
 
 export interface BuzzedListSeen {
-  /** Exact and in order: the earliest buzz first. */
+  /**
+   * Exact and in order: the earliest buzz first. A `plates` or `since` left out is not checked,
+   * so a scenario about the order of the lines need not restate their clocks.
+   */
   lists(lines: readonly BuzzedLineSeen[]): Promise<void>;
   includes(line: BuzzedLineSeen): Promise<void>;
   isEmpty(): Promise<void>;
@@ -134,7 +140,10 @@ export interface SoldOutOrderSeen {
 
 /** A sold-out product's banner over the board. */
 export interface SoldOutSeen {
-  /** Exact and in FIFO order: the open orders still waiting for the product. */
+  /**
+   * Exact and in FIFO order: the open orders still waiting for the product. A `plates` left out
+   * is not checked, so a scenario about who waits need not restate how many plates.
+   */
   lists(orders: readonly SoldOutOrderSeen[]): Promise<void>;
   /** The banner reads "niemand wartet". */
   nobodyWaits(): Promise<void>;
@@ -255,6 +264,7 @@ export interface See {
 }
 
 export interface Time {
+  /** Time only moves forward, so a duration of none or less is refused (#8). */
   passes(duration: Duration): Promise<void>;
   /**
    * "Samstag 11:30": Berlin wall-clock time on a day of this Kirbe. Time only moves forward, and

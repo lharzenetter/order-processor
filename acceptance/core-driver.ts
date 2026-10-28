@@ -2,10 +2,8 @@ import {
   acceptsIntake,
   boardRows,
   buzzedLines,
-  evaluationRows,
   fold,
   handOnTarget,
-  kirbeShifts,
   labelOf,
   nextOrderFor,
   openOrderByPager,
@@ -13,41 +11,34 @@ import {
   orderView,
   pagerCheck,
   pagerOverview,
-  shiftComparison,
   soldOutWaiting,
   undoTarget,
 } from "../src/core";
 import type {
-  ComparisonCell,
   Event,
   EventBody,
-  EvaluationRow,
-  KirbeDay,
   Order,
   OrderViewLine,
   PlateCount,
   ProductId,
-  Shift,
   State,
 } from "../src/core";
+import { expectComparisonCell, expectEvaluationRow } from "./figures";
+import { clockOf, movingTo, msOf, passing, START_AT } from "./kirbe-calendar";
 import type {
-  AverageSeen,
   BuzzedLineRef,
   BuzzedLineSeen,
-  ComparisonCellSeen,
-  CrewName,
   Duration,
-  EvaluationRowSeen,
-  KirbeDayName,
   LineSeen,
   OpenOrderSeen,
   Plates,
-  ShiftName,
-  SoldOutCellSeen,
   SoldOutOrderSeen,
   Steps,
   Window,
 } from "./window";
+
+/** How the intake grid and the header show a pager. */
+type PagerState = "with the guest" | "free" | "missing";
 
 /** A line of the buzzed list as staff read it. */
 interface BuzzedRow {
@@ -58,178 +49,37 @@ interface BuzzedRow {
   readonly rebuzzDue: boolean;
 }
 
-function msOf({ minutes = 0, seconds = 0 }: Duration): number {
-  return (minutes * 60 + seconds) * 1000;
+/** What an exact `lists` observation compares: every item, in order, and nothing else. */
+interface Listing<Shown, Wanted> {
+  /** "the buzzed list", as the failure names it. */
+  readonly list: string;
+  readonly shown: readonly Shown[];
+  readonly wanted: readonly Wanted[];
+  readonly matches: (shown: Shown, want: Wanted) => boolean;
+  readonly describeShown: (shown: readonly Shown[]) => string;
+  readonly describeWanted: (wanted: readonly Wanted[]) => string;
 }
 
-/** "4:05", as the buzzed list's clock reads; the screen drops part-seconds. */
-function clockOf(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-// This Kirbe runs Samstag 24. to Montag 26. Oktober 2026, so its Sunday night has the end of summer
-// time, as the shift tests in the core have.
-const KIRBE_SATURDAY = { year: 2026, month: 10, day: 24 } as const;
-
-const DAY_OFFSET: Readonly<Record<KirbeDayName, number>> = {
-  Samstag: 0,
-  Sonntag: 1,
-  Montag: 2,
-};
-
-const CORE_DAY: Readonly<Record<KirbeDayName, KirbeDay>> = {
-  Samstag: "samstag",
-  Sonntag: "sonntag",
-  Montag: "montag",
-};
-
-const HOUR_MS = 60 * 60_000;
-
-// The Kirbe is in Berlin whatever the machine running the scenarios is set to.
-const BERLIN = new Intl.DateTimeFormat("de-DE", {
-  timeZone: "Europe/Berlin",
-  hourCycle: "h23",
-  weekday: "long",
-  year: "numeric",
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function berlinParts(at: number): Readonly<Record<string, string>> {
-  return Object.fromEntries(
-    BERLIN.formatToParts(at).map((part) => [part.type, part.value]),
-  );
-}
-
-/** "11:30", as the Auswertung shows a time of day. */
-function berlinClock(at: number): string {
-  const { hour = "", minute = "" } = berlinParts(at);
-  return `${hour}:${minute}`;
-}
-
-/** "Samstag 11:30", as a scenario writes it. */
-function dayAndTimeOf(at: number): string {
-  return `${berlinParts(at).weekday ?? ""} ${berlinClock(at)}`;
-}
-
-function isKirbeDay(day: string): day is KirbeDayName {
-  return day in DAY_OFFSET;
-}
-
-/** The instant of "Samstag 11:30" on this Kirbe's calendar; refuses an hour that is not one. */
-function kirbeAt(dayAndTime: string): number {
-  const match = /^(Samstag|Sonntag|Montag) (\d{1,2}):(\d{2})$/.exec(dayAndTime);
-  const [, day, hour, minute] = match ?? [];
-  if (
-    day === undefined ||
-    !isKirbeDay(day) ||
-    hour === undefined ||
-    minute === undefined ||
-    Number(hour) > 23 ||
-    Number(minute) > 59
-  ) {
+function expectListed<Shown, Wanted>({
+  list,
+  shown,
+  wanted,
+  matches,
+  describeShown,
+  describeWanted,
+}: Listing<Shown, Wanted>): Promise<void> {
+  const same =
+    shown.length === wanted.length &&
+    wanted.every((want, i) => {
+      const item = shown[i];
+      return item !== undefined && matches(item, want);
+    });
+  if (!same) {
     throw new Error(
-      `"${dayAndTime}" is no time on the Kirbe: write a Kirbe day and a time, as in "Samstag 11:30"`,
+      `expected ${list} to list ${describeWanted(wanted)}, but it lists ${describeShown(shown)}`,
     );
   }
-  const offset = DAY_OFFSET[day];
-  // Berlin is two hours ahead in summer time and one in winter time; keep what reads back right.
-  const candidates = [2, 1]
-    .map(
-      (ahead) =>
-        Date.UTC(
-          KIRBE_SATURDAY.year,
-          KIRBE_SATURDAY.month - 1,
-          KIRBE_SATURDAY.day + offset,
-          Number(hour),
-          Number(minute),
-        ) -
-        ahead * HOUR_MS,
-    )
-    .filter(
-      (at) => dayAndTimeOf(at) === `${day} ${hour.padStart(2, "0")}:${minute}`,
-    );
-  const [at, twice] = candidates;
-  if (at === undefined) {
-    throw new Error(`"${dayAndTime}" never happens: the clocks skip that hour`);
-  }
-  if (twice !== undefined) {
-    throw new Error(
-      `"${dayAndTime}" happens twice: the clocks go back from 03:00 to 02:00 that night`,
-    );
-  }
-  return at;
-}
-
-// Every scenario starts when the Kirbe opens (#8).
-const START_AT = kirbeAt("Samstag 10:00");
-
-/** "Samstag · Gruppe A", as the Festbetrieb plan names a shift. */
-function shiftText({ day, crew }: ShiftName): string {
-  return `${day} · Gruppe ${crew}`;
-}
-
-/** An average as the Auswertung shows it: "m:ss", or "–". */
-function averageText(averageMs: number | undefined): string {
-  return averageMs === undefined ? "–" : clockOf(averageMs);
-}
-
-function wantedAverage(average: AverageSeen): string {
-  return average === "none" ? "–" : clockOf(msOf(average));
-}
-
-function quoted(text: string): string {
-  return text === "" ? "empty" : `"${text}"`;
-}
-
-/** One figure of a table, as staff read it, and what the scenario wants it to read. */
-interface Figure {
-  readonly column: string;
-  readonly shown: string;
-  readonly want: string | undefined;
-}
-
-/** Fails on the first figure that reads otherwise. */
-function expectFigures(where: string, figures: readonly Figure[]): void {
-  for (const { column, shown, want } of figures) {
-    if (want !== undefined && shown !== want) {
-      throw new Error(
-        `expected "${column}" ${where} to read ${quoted(want)}, but it reads ${quoted(shown)}`,
-      );
-    }
-  }
-}
-
-function cellFigures(
-  cell: ComparisonCell,
-  want: ComparisonCellSeen,
-): readonly Figure[] {
-  return [
-    {
-      column: "Ausgegeben",
-      shown: String(cell.handedOver),
-      want: want.handedOver === undefined ? undefined : String(want.handedOver),
-    },
-    {
-      column: "Ø Wartezeit",
-      shown: averageText(cell.averageWaitingTimeMs),
-      want:
-        want.waitingTime === undefined
-          ? undefined
-          : wantedAverage(want.waitingTime),
-    },
-    {
-      column: "Ø Abholzeit",
-      shown: averageText(cell.averagePickupTimeMs),
-      want:
-        want.pickupTime === undefined
-          ? undefined
-          : wantedAverage(want.pickupTime),
-    },
-  ];
+  return Promise.resolve();
 }
 
 /** Runs a scenario on `fold` and the selectors: the same reads the UI makes (#7). */
@@ -266,7 +116,11 @@ export function coreWindow(): Window {
     return orderView(state, openOrder(pager).id, now)?.lines ?? [];
   }
 
-  function pagerState(pager: number): string {
+  function lineOf(pager: number, product: string): OrderViewLine | undefined {
+    return linesOf(pager).find((l) => l.productId === product);
+  }
+
+  function pagerState(pager: number): PagerState {
     const overview = pagerOverview(state);
     if (overview.attached.includes(pager)) {
       return "with the guest";
@@ -332,6 +186,10 @@ export function coreWindow(): Window {
     return describeBuzzed({ ...row, since: { seconds: row.sinceMs / 1000 } });
   }
 
+  function rowsText(rows: readonly BuzzedRow[]): string {
+    return rows.map(describeRow).join(", ") || "nothing";
+  }
+
   function buzzedListRows(): readonly BuzzedRow[] {
     return buzzedLines(state, now).map((l) => ({
       pager: l.pager,
@@ -343,7 +201,7 @@ export function coreWindow(): Window {
     }));
   }
 
-  function matches(row: BuzzedRow, want: BuzzedLineSeen): boolean {
+  function rowMatches(row: BuzzedRow, want: BuzzedLineSeen): boolean {
     return (
       row.pager === want.pager &&
       row.product === want.product &&
@@ -366,7 +224,7 @@ export function coreWindow(): Window {
   }
 
   function buzzedOf(pager: number, product: ProductId): number {
-    return linesOf(pager).find((l) => l.productId === product)?.buzzed ?? 0;
+    return lineOf(pager, product)?.buzzed ?? 0;
   }
 
   /** Who the "Weitergeben" button names, or why the popup offers none. */
@@ -381,7 +239,7 @@ export function coreWindow(): Window {
   }
 
   function waitingOf(pager: number, product: ProductId): number {
-    return linesOf(pager).find((l) => l.productId === product)?.waiting ?? 0;
+    return lineOf(pager, product)?.waiting ?? 0;
   }
 
   function boardRow(product: ProductId) {
@@ -463,6 +321,10 @@ export function coreWindow(): Window {
     return `pager ${String(pager)}: ${owed.join(", ")}`;
   }
 
+  function openOrdersText(orders: readonly OpenOrderSeen[]): string {
+    return orders.map(describeOpenOrder).join("; ") || "nothing";
+  }
+
   function pagersText(pagers: readonly number[]): string {
     return pagers.length === 0
       ? "nobody"
@@ -481,111 +343,12 @@ export function coreWindow(): Window {
 
   /** The first product the Ausgabe stepper cannot reach, or `null` when it allows every plate. */
   function beyondStepper(pager: number, plates: Plates): PlateCount | null {
-    const lines = linesOf(pager);
     return (
       toPlateCounts(plates).find(({ productId, count }) => {
-        const line = lines.find((l) => l.productId === productId);
+        const line = lineOf(pager, productId);
         return count > (line === undefined ? 0 : line.buzzed + line.waiting);
       }) ?? null
     );
-  }
-
-  function shiftOf(name: ShiftName): Shift {
-    const shifts = kirbeShifts(state);
-    const shift = shifts.find(
-      (s) => s.day === CORE_DAY[name.day] && s.crew === name.crew,
-    );
-    if (shift === undefined) {
-      throw new Error(
-        `the Auswertung offers no ${shiftText(name)}: ${
-          shifts.length === 0
-            ? "it shows no shifts before the first action"
-            : "the Festbetrieb plan has no such shift"
-        }`,
-      );
-    }
-    return shift;
-  }
-
-  function evaluationRow(
-    product: ProductId,
-    shift: ShiftName | undefined,
-  ): EvaluationRow {
-    const row = evaluationRows(
-      state,
-      shift === undefined ? undefined : shiftOf(shift).id,
-    ).find((r) => r.productId === product);
-    if (row === undefined) {
-      throw new Error(`the Auswertung has no row for ${labelOf(product)}`);
-    }
-    return row;
-  }
-
-  /** The "Ausverkauft um" cell as the Auswertung writes it. */
-  function soldOutText(row: EvaluationRow): string {
-    const since =
-      row.soldOutSince === undefined ? [] : [`seit ${row.soldOutSince}`];
-    const at =
-      row.soldOutFirstAt === undefined ? [] : [berlinClock(row.soldOutFirstAt)];
-    return `${[...since, ...at].join(", ")}${row.soldOutCleared ? " (wieder frei)" : ""}`;
-  }
-
-  function wantedSoldOut(soldOut: SoldOutCellSeen | "never"): string {
-    if (soldOut === "never") {
-      return "";
-    }
-    const { at, since, availableAgain = false } = soldOut;
-    const parts = [
-      ...(since === undefined ? [] : [`seit ${shiftOf(since).label}`]),
-      ...(at === undefined ? [] : [at]),
-    ];
-    return `${parts.join(", ")}${availableAgain ? " (wieder frei)" : ""}`;
-  }
-
-  function evaluationFigures(
-    row: EvaluationRow,
-    want: EvaluationRowSeen,
-  ): readonly Figure[] {
-    return [
-      {
-        column: "Gemacht",
-        shown: String(row.made),
-        want: want.made === undefined ? undefined : String(want.made),
-      },
-      ...cellFigures(row, want),
-      {
-        column: "Ausverkauft um",
-        shown: soldOutText(row),
-        want:
-          want.soldOut === undefined ? undefined : wantedSoldOut(want.soldOut),
-      },
-    ];
-  }
-
-  /** The Vergleich's cell for a product, or its "Gesamt" row, in a shift's or a crew's column. */
-  function comparisonCell(
-    column: ShiftName | CrewName,
-    product: ProductId | "total",
-  ): ComparisonCell {
-    const byShift = "day" in column;
-    const comparison = shiftComparison(state, byShift ? "shift" : "crew");
-    const label = byShift ? shiftOf(column).label : `Gruppe ${column.crew}`;
-    const index = comparison.columns.findIndex((c) => c.label === label);
-    const name = byShift ? shiftText(column) : label;
-    if (index === -1) {
-      throw new Error(`the Vergleich has no column for ${name}`);
-    }
-    const cells =
-      product === "total"
-        ? comparison.totals
-        : comparison.rows.find((r) => r.productId === product)?.cells;
-    const cell = cells?.[index];
-    if (cell === undefined) {
-      throw new Error(
-        `the Vergleich has no ${product === "total" ? "Gesamt row" : `row for ${labelOf(product)}`}`,
-      );
-    }
-    return cell;
   }
 
   /** The line's "Wartezeit" or "Abholzeit" in the order popup, as "m:ss". */
@@ -595,7 +358,7 @@ export function coreWindow(): Window {
     which: "Wartezeit" | "Abholzeit",
     want: Duration,
   ): Promise<void> {
-    const line = linesOf(pager).find((l) => l.productId === product);
+    const line = lineOf(pager, product);
     const shownMs =
       which === "Wartezeit" ? line?.waitingTimeMs : line?.pickupTimeMs;
     const what = `pager ${String(pager)}'s order to show ${which} ${clockOf(msOf(want))} for ${labelOf(product)}`;
@@ -822,14 +585,16 @@ export function coreWindow(): Window {
             }
             return Promise.resolve();
           },
-          showsWaitingTime: (product, waitingTime) =>
-            expectLineTime(pager, product, "Wartezeit", waitingTime),
-          showsPickupTime: (product, pickupTime) =>
-            expectLineTime(pager, product, "Abholzeit", pickupTime),
+          showsWaitingTime(product, waitingTime) {
+            return expectLineTime(pager, product, "Wartezeit", waitingTime);
+          },
+          showsPickupTime(product, pickupTime) {
+            return expectLineTime(pager, product, "Abholzeit", pickupTime);
+          },
         };
       },
       pager(pager) {
-        function expectState(want: string): Promise<void> {
+        function expectState(want: PagerState): Promise<void> {
           const actual = pagerState(pager);
           if (actual !== want) {
             throw new Error(
@@ -847,25 +612,21 @@ export function coreWindow(): Window {
       buzzedList() {
         return {
           lists(lines) {
-            const rows = buzzedListRows();
-            const same =
-              rows.length === lines.length &&
-              lines.every((want, i) => {
-                const row = rows[i];
-                return row !== undefined && matches(row, want);
-              });
-            if (!same) {
-              throw new Error(
-                `expected the buzzed list to list ${lines.map(describeBuzzed).join(", ") || "nothing"}, but it lists ${rows.map(describeRow).join(", ") || "nothing"}`,
-              );
-            }
-            return Promise.resolve();
+            return expectListed({
+              list: "the buzzed list",
+              shown: buzzedListRows(),
+              wanted: lines,
+              matches: rowMatches,
+              describeShown: rowsText,
+              describeWanted: (wanted) =>
+                wanted.map(describeBuzzed).join(", ") || "nothing",
+            });
           },
           includes(line) {
             const rows = buzzedListRows();
-            if (!rows.some((row) => matches(row, line))) {
+            if (!rows.some((row) => rowMatches(row, line))) {
               throw new Error(
-                `expected the buzzed list to include ${describeBuzzed(line)}, but it lists ${rows.map(describeRow).join(", ") || "nothing"}`,
+                `expected the buzzed list to include ${describeBuzzed(line)}, but it lists ${rowsText(rows)}`,
               );
             }
             return Promise.resolve();
@@ -874,7 +635,7 @@ export function coreWindow(): Window {
             const rows = buzzedListRows();
             if (rows.length > 0) {
               throw new Error(
-                `expected the buzzed list to be empty, but it lists ${rows.map(describeRow).join(", ")}`,
+                `expected the buzzed list to be empty, but it lists ${rowsText(rows)}`,
               );
             }
             return Promise.resolve();
@@ -956,22 +717,16 @@ export function coreWindow(): Window {
         const label = labelOf(product);
         return {
           lists(orders) {
-            const shown = soldOutOrders(product);
-            const same =
-              shown.length === orders.length &&
-              orders.every((want, i) => {
-                const chip = shown[i];
-                return (
-                  chip?.pager === want.pager &&
-                  (want.plates === undefined || chip.plates === want.plates)
-                );
-              });
-            if (!same) {
-              throw new Error(
-                `expected the ${label} sold-out banner to list ${chipsText(orders)}, but it lists ${chipsText(shown)}`,
-              );
-            }
-            return Promise.resolve();
+            return expectListed({
+              list: `the ${label} sold-out banner`,
+              shown: soldOutOrders(product),
+              wanted: orders,
+              matches: (chip, want) =>
+                chip.pager === want.pager &&
+                (want.plates === undefined || chip.plates === want.plates),
+              describeShown: chipsText,
+              describeWanted: chipsText,
+            });
           },
           nobodyWaits() {
             const shown = soldOutOrders(product);
@@ -987,19 +742,14 @@ export function coreWindow(): Window {
       openOrdersList() {
         return {
           lists(orders) {
-            const rows = openOrdersRows();
-            const same =
-              rows.length === orders.length &&
-              orders.every((want, i) => {
-                const row = rows[i];
-                return row !== undefined && sameOpenOrder(row, want);
-              });
-            if (!same) {
-              throw new Error(
-                `expected the Offene Bestellungen list to show ${orders.map(describeOpenOrder).join("; ") || "nothing"}, but it shows ${rows.map(describeOpenOrder).join("; ") || "nothing"}`,
-              );
-            }
-            return Promise.resolve();
+            return expectListed({
+              list: "the Offene Bestellungen list",
+              shown: openOrdersRows(),
+              wanted: orders,
+              matches: sameOpenOrder,
+              describeShown: openOrdersText,
+              describeWanted: openOrdersText,
+            });
           },
         };
       },
@@ -1052,18 +802,11 @@ export function coreWindow(): Window {
         };
       },
       evaluation(shift) {
-        const where =
-          shift === undefined
-            ? "in the Auswertung (Gesamt)"
-            : `in the Auswertung of ${shiftText(shift)}`;
         return {
           row(product) {
             return {
               has(want) {
-                expectFigures(
-                  `for ${labelOf(product)} ${where}`,
-                  evaluationFigures(evaluationRow(product, shift), want),
-                );
+                expectEvaluationRow(state, product, shift, want);
                 return Promise.resolve();
               },
             };
@@ -1071,16 +814,11 @@ export function coreWindow(): Window {
         };
       },
       comparison(column) {
-        const name =
-          "day" in column ? shiftText(column) : `Gruppe ${column.crew}`;
         return {
           row(product) {
             return {
               has(want) {
-                expectFigures(
-                  `for ${labelOf(product)} in the Vergleich's column ${name}`,
-                  cellFigures(comparisonCell(column, product), want),
-                );
+                expectComparisonCell(state, column, product, want);
                 return Promise.resolve();
               },
             };
@@ -1088,10 +826,7 @@ export function coreWindow(): Window {
           total() {
             return {
               has(want) {
-                expectFigures(
-                  `for Gesamt in the Vergleich's column ${name}`,
-                  cellFigures(comparisonCell(column, "total"), want),
-                );
+                expectComparisonCell(state, column, "total", want);
                 return Promise.resolve();
               },
             };
@@ -1101,17 +836,11 @@ export function coreWindow(): Window {
     },
     time: {
       passes(duration) {
-        now += msOf(duration);
+        now = passing(now, duration);
         return Promise.resolve();
       },
       isNow(dayAndTime) {
-        const at = kirbeAt(dayAndTime);
-        if (at < now) {
-          throw new Error(
-            `time only moves forward: it is ${dayAndTimeOf(now)} already, past ${dayAndTime}`,
-          );
-        }
-        now = at;
+        now = movingTo(now, dayAndTime);
         return Promise.resolve();
       },
     },
