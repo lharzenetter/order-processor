@@ -1,8 +1,5 @@
 import { scenario } from "../scenario";
 
-// PROTOTYPE (#12): the first slice, moved over from src/core/handover.test.ts,
-// pagers.test.ts and gerufen.test.ts.
-
 scenario(
   "an order taken on a free pager attaches it to the guest",
   async ({ staff, see }) => {

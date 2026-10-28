@@ -71,8 +71,7 @@ describe("the order popup", () => {
 });
 
 describe("the handover (Ausgabe)", () => {
-  // 04-allocation-and-handover-rules: partial pickup keeps the pager with the guest
-  it("hands over buzzed plates first and keeps the order open while plates remain", () => {
+  it("counts a handed-over plate as buzzed on the board row", () => {
     const { log, order } = orderOn7();
     log.add({
       type: "platesBuzzed",
@@ -85,37 +84,12 @@ describe("the handover (Ausgabe)", () => {
       orderId: order.id,
       plates: [{ productId: "braten", count: 1 }],
     });
-    const state = fold(log.events);
-    expect(buzzedLines(state, log.now)).toEqual([]);
-    expect(orderView(state, order.id, log.now)?.lines).toEqual([
-      expect.objectContaining({ productId: "pommes", buzzed: 0, waiting: 1 }),
-      expect.objectContaining({ productId: "braten", buzzed: 0, waiting: 1 }),
-    ]);
     expect(
-      boardRows(state).find((r) => r.productId === "braten")?.next,
+      boardRows(fold(log.events)).find((r) => r.productId === "braten")?.next,
     ).toMatchObject({ pager: 7, calledCount: 1, plateCount: 2 });
-    expect(openOrderByPager(state, 7)?.id).toBe(order.id);
   });
 
-  it("can hand over unbuzzed plates too", () => {
-    const { log, order } = orderOn7();
-    log.add({
-      type: "platesBuzzed",
-      orderId: order.id,
-      productId: "braten",
-      count: 1,
-    });
-    log.add({
-      type: "platesHandedOver",
-      orderId: order.id,
-      plates: [{ productId: "braten", count: 2 }],
-    });
-    const lines = orderView(fold(log.events), order.id, log.now)?.lines;
-    expect(lines?.map((l) => l.productId)).toEqual(["pommes"]);
-  });
-
-  // 04-allocation-and-handover-rules: the pager is freed on the last handover
-  it("closes the order and frees its pager with the handover that empties it", () => {
+  it("records the closing handover on the order and in the header", () => {
     const { log, order } = orderOn7();
     log.add({
       type: "platesBuzzed",
@@ -139,8 +113,6 @@ describe("the handover (Ausgabe)", () => {
       lines: [],
     });
     expect(state.orders[0]?.closedAt).toBe(handover.at);
-    expect(openOrderByPager(state, 7)).toBeNull();
-    expect(pagerOverview(state).free).toContain(7);
     expect(headerCounts(state)).toEqual({ openOrders: 0, freePagers: 30 });
   });
 

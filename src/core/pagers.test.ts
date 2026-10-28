@@ -29,10 +29,8 @@ describe("pagers", () => {
     expect(overview.allOut).toBe(false);
   });
 
-  it("are attached while an open order holds them", () => {
+  it("are counted in the header while an open order holds them", () => {
     const state = foldBodies({ type: "orderTaken", pager: 4, plates: POMMES });
-    expect(pagerOverview(state)).toMatchObject({ attached: [4], missing: [] });
-    expect(pagerOverview(state).free).not.toContain(4);
     expect(headerCounts(state)).toEqual({ openOrders: 1, freePagers: 29 });
   });
 

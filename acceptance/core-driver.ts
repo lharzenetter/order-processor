@@ -20,7 +20,7 @@ import type {
 } from "../src/core";
 import type { BuzzedLineSeen, LineSeen, Plates, Window } from "./window";
 
-// PROTOTYPE (#12). Samstag 10:00 waits for the time area; any fixed instant will do here.
+// Samstag 10:00 comes with the evaluation scenarios (#20); until then any fixed instant will do.
 const START_AT = 1_760_000_000_000;
 
 /** Runs a scenario on `fold` and the selectors: the same reads the UI makes (#7). */

@@ -1,7 +1,6 @@
 import type { ProductId } from "../src/core";
 
-// PROTOTYPE (#12): the first slice only. Every call is async so a Playwright driver can sit
-// behind the same interface (#5).
+// Every call is async so a Playwright driver can sit behind the same interface (#5).
 
 /** Plates per product, as on a meal voucher or in the Ausgabe stepper. */
 export type Plates = Partial<Readonly<Record<ProductId, number>>>;
