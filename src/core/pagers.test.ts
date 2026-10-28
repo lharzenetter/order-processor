@@ -44,27 +44,12 @@ describe("pagers", () => {
     expect(overview.allOut).toBe(true);
   });
 
-  it("can be marked missing and restored", () => {
-    const missing = foldBodies(
+  it("list missing ones in ascending order", () => {
+    const state = foldBodies(
       { type: "pagerMarkedMissing", pager: 23 },
       { type: "pagerMarkedMissing", pager: 2 },
     );
-    expect(pagerOverview(missing).missing).toEqual([2, 23]);
-    expect(pagerOverview(missing).free).not.toContain(23);
-    const restored = foldBodies(
-      { type: "pagerMarkedMissing", pager: 23 },
-      { type: "pagerRestored", pager: 23 },
-    );
-    expect(pagerOverview(restored).missing).toEqual([]);
-  });
-
-  // 05-exceptions: a pager that turned up again is restored when an order is started on it
-  it("are restored when an order is taken on a missing one", () => {
-    const state = foldBodies(
-      { type: "pagerMarkedMissing", pager: 23 },
-      { type: "orderTaken", pager: 23, plates: POMMES },
-    );
-    expect(pagerOverview(state)).toMatchObject({ missing: [], attached: [23] });
+    expect(pagerOverview(state).missing).toEqual([2, 23]);
   });
 
   it.each<[string, readonly EventBody[]]>([

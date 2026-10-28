@@ -89,6 +89,22 @@ export function coreWindow(): Window {
     return overview.missing.includes(pager) ? "missing" : "free";
   }
 
+  /** Fails unless the pager's tile in the "Pager fehlt…" mode would do what the step means. */
+  function expectMissingModeTile(
+    pager: number,
+    want: "free" | "missing",
+  ): void {
+    const check = pagerCheck(state, pager);
+    if (check === "outOfRange") {
+      throw new Error(`intake's pager grid has no pager ${String(pager)}`);
+    }
+    if (check !== want) {
+      throw new Error(
+        `intake's "Pager fehlt…" mode offers no ${want === "free" ? "marking" : "restoring"} of pager ${String(pager)}: it is ${pagerState(pager)}`,
+      );
+    }
+  }
+
   function checkLines(
     pager: number,
     expected: Partial<Readonly<Record<ProductId, LineSeen>>>,
@@ -410,6 +426,24 @@ export function coreWindow(): Window {
         append({ type: "soldOutCleared", productId: product });
         return Promise.resolve();
       },
+      abandonOrder({ pager, pagerBack }) {
+        append({
+          type: "orderAbandoned",
+          orderId: openOrder(pager).id,
+          pagerBack,
+        });
+        return Promise.resolve();
+      },
+      markPagerMissing(pager) {
+        expectMissingModeTile(pager, "free");
+        append({ type: "pagerMarkedMissing", pager });
+        return Promise.resolve();
+      },
+      restorePager(pager) {
+        expectMissingModeTile(pager, "missing");
+        append({ type: "pagerRestored", pager });
+        return Promise.resolve();
+      },
     },
     see: {
       order({ pager }) {
@@ -471,6 +505,7 @@ export function coreWindow(): Window {
         return {
           isWithTheGuest: () => expectState("with the guest"),
           isFree: () => expectState("free"),
+          isMissing: () => expectState("missing"),
         };
       },
       buzzedList() {
