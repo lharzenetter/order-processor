@@ -178,7 +178,6 @@ scenario(
   },
 );
 
-// #16: waiting time and pickup time ignore a re-buzz
 scenario(
   "a re-buzz does not restart the pickup time",
   async ({ staff, see, time }) => {
@@ -286,7 +285,6 @@ scenario(
   },
 );
 
-// #19: an undone mark is forgotten
 scenario(
   "an undone sold-out mark leaves no sold-out time in the Auswertung",
   async ({ staff, see }) => {
@@ -380,7 +378,6 @@ scenario(
   },
 );
 
-// #19
 scenario(
   "a shift does not count an undone handover",
   async ({ staff, see, time }) => {

@@ -58,7 +58,6 @@ scenario(
   },
 );
 
-// #16
 scenario(
   "staff cannot hand on a plate while no other order waits for it",
   async ({ staff, see }) => {
@@ -85,7 +84,6 @@ scenario(
   },
 );
 
-// #16
 scenario(
   "back to queue clears the line's clock only when its last buzzed plate goes back",
   async ({ staff, see, time }) => {
@@ -109,7 +107,6 @@ scenario(
   },
 );
 
-// #16
 scenario(
   "the buzzed list shows the time since each buzz",
   async ({ staff, see, time }) => {
@@ -125,7 +122,6 @@ scenario(
   },
 );
 
-// #16
 scenario(
   "the buzzed list lists the oldest buzz first",
   async ({ staff, see, time }) => {
@@ -157,7 +153,6 @@ scenario(
   },
 );
 
-// #16
 scenario(
   "a re-buzz restarts the line's clock",
   async ({ staff, see, time }) => {
@@ -175,7 +170,6 @@ scenario(
   },
 );
 
-// #16
 scenario(
   "buzzing another plate onto a buzzed line keeps its clock",
   async ({ staff, see, time }) => {

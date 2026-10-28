@@ -1,6 +1,5 @@
 import { scenario } from "../scenario";
 
-// #17
 scenario(
   "cancelling waiting plates keeps the order open while plates remain",
   async ({ staff, see }) => {
@@ -22,7 +21,6 @@ scenario("staff cannot cancel a buzzed plate", async ({ staff, see }) => {
   await see.order({ pager: 7 }).cannotCancel("pommes");
 });
 
-// #17
 scenario(
   "cancelling the last waiting plates closes the order and frees its pager",
   async ({ staff, see }) => {
@@ -69,7 +67,6 @@ scenario(
   },
 );
 
-// #17
 scenario(
   "a sold-out product is marked on the board",
   async ({ staff, see }) => {
@@ -91,7 +88,6 @@ scenario(
   },
 );
 
-// #17
 scenario(
   "a product marked sold out can be cleared again",
   async ({ staff, see }) => {
