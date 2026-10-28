@@ -74,6 +74,10 @@ export interface OrderSeen {
   cannotHandOn(product: ProductId): Promise<void>;
   /** The order popup offers no "1 … stornieren" for this product. */
   cannotCancel(product: ProductId): Promise<void>;
+  /** The line's "Wartezeit m:ss", shown while plates wait for the kitchen. */
+  showsWaitingTime(product: ProductId, waitingTime: Duration): Promise<void>;
+  /** The line's "Abholzeit m:ss", shown while plates are buzzed. */
+  showsPickupTime(product: ProductId, pickupTime: Duration): Promise<void>;
 }
 
 export interface PagerSeen {
@@ -165,6 +169,73 @@ export interface UndoSeen {
   offersNothing(): Promise<void>;
 }
 
+/** A Kirbe day as staff write it, with a capital letter. */
+export type KirbeDayName = "Samstag" | "Sonntag" | "Montag";
+
+export type Crew = "A" | "B" | "C";
+
+/** A shift of the Festbetrieb plan: "Samstag · Gruppe A" (#8). */
+export interface ShiftName {
+  day: KirbeDayName;
+  crew: Crew;
+}
+
+/** A crew's column in the Vergleich "nach Gruppe": "Gruppe A". */
+export interface CrewName {
+  crew: Crew;
+}
+
+/** An average in the Auswertung: "m:ss", or "–" when no plate has one. */
+export type AverageSeen = Duration | "none";
+
+/** The "Ausverkauft um" cell, compared exactly: a field left out is not shown. */
+export interface SoldOutCellSeen {
+  /** "19:40": when the product first sold out, in this shift for one shift's tab. */
+  at?: string;
+  /** "seit Sa B": sold out since an earlier shift. */
+  since?: ShiftName;
+  /** "(wieder frei)". */
+  availableAgain?: boolean;
+}
+
+/** A product's row in the Auswertung; fields left out are not checked. */
+export interface EvaluationRowSeen {
+  /** "Gemacht". */
+  made?: number;
+  /** "Ausgegeben". */
+  handedOver?: number;
+  /** "Ø Wartezeit". */
+  waitingTime?: AverageSeen;
+  /** "Ø Abholzeit". */
+  pickupTime?: AverageSeen;
+  /** "Ausverkauft um"; "never" for an empty cell. */
+  soldOut?: SoldOutCellSeen | "never";
+}
+
+export interface EvaluationSeen {
+  row(product: ProductId): {
+    has(row: EvaluationRowSeen): Promise<void>;
+  };
+}
+
+/** A cell of the Vergleich; fields left out are not checked. */
+export interface ComparisonCellSeen {
+  handedOver?: number;
+  waitingTime?: AverageSeen;
+  pickupTime?: AverageSeen;
+}
+
+/** One column of the Vergleich: a shift's ("nach Schicht") or a crew's ("nach Gruppe"). */
+export interface ComparisonColumnSeen {
+  row(product: ProductId): {
+    has(cell: ComparisonCellSeen): Promise<void>;
+  };
+  /** The "Gesamt" row: every product together. */
+  total(): {
+    has(cell: ComparisonCellSeen): Promise<void>;
+  };
+}
+
 /** What window staff see. Nothing here reaches past the screen (#7). */
 export interface See {
   /** The open order on this pager, as the Ausgabe popup shows it. */
@@ -177,10 +248,19 @@ export interface See {
   openOrdersList(): OpenOrdersListSeen;
   intake(): IntakeSeen;
   undo(): UndoSeen;
+  /** The Auswertung in the Verwaltung: "Gesamt", or the tab of one shift. */
+  evaluation(shift?: ShiftName): EvaluationSeen;
+  /** The Vergleich in the Auswertung, at the column of a shift or a crew. */
+  comparison(column: ShiftName | CrewName): ComparisonColumnSeen;
 }
 
 export interface Time {
   passes(duration: Duration): Promise<void>;
+  /**
+   * "Samstag 11:30": Berlin wall-clock time on a day of this Kirbe. Time only moves forward, and
+   * the hour the clocks go back is refused as ambiguous (#8).
+   */
+  isNow(dayAndTime: `${KirbeDayName} ${string}`): Promise<void>;
 }
 
 export interface Window {
