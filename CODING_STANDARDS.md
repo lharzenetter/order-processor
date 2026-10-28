@@ -74,7 +74,7 @@ Playwright, ESLint + Prettier.
 - A scenario names steps and observations with `CONTEXT.md` terms, imports no runner, and observes
   only what window staff can see. A rule the screen can't show belongs in a core test.
 - Every step and observation is async, so a UI driver can run the same scenario.
-- Tests drive the public API only: a list of stamped events, `fold`, and selectors at a `now`.
+- Core tests drive the public API only: a list of stamped events, `fold`, and selectors at a `now`.
   `storage/` is tested through `openDeviceStore` with `fake-indexeddb`.
 - No real timers. Test names describe behaviour in glossary language.
 - A test for a rule from a ticket cites its GitHub issue: `// #42`. Citations of the older local
