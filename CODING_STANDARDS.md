@@ -70,11 +70,12 @@ Playwright, ESLint + Prettier.
 - Tests drive the public API only: a list of stamped events, `fold`, and selectors at a `now`.
   `storage/` is tested through `openDeviceStore` with `fake-indexeddb`.
 - No real timers. Test names describe behaviour in glossary language.
-- A test for a rule from a map ticket cites it: `// 05-exceptions`.
+- A test for a rule from a ticket cites its GitHub issue: `// #42`. Citations of the older local
+  tickets (`// 05-exceptions`, `// server-sync 02`) stay as they are.
 - `server/` is test-first for every protocol rule, driven through the handler with `Request`
   objects on a SQLite file in a fresh temp directory. A protocol scenario is written once, in
   `contract/`, and runs against both the fake sync server and the real handler. A rule from a
-  ticket cites it: `// server-sync 02`.
+  ticket cites its issue: `// #42`.
 - React components get thin tests only where they hold logic. Playwright covers the smoke flows
   on the built app.
 - No coverage gate. Test files sit next to the code.
