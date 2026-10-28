@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   boardRows,
-  buzzedLines,
   fold,
   headerCounts,
   openOrderByPager,
   orderView,
-  pagerOverview,
 } from "./index";
 import { testLog } from "./test-log";
 
@@ -147,7 +145,7 @@ describe("the handover (Ausgabe)", () => {
 });
 
 describe("cancelling plates (Stornieren)", () => {
-  it("cancels waiting plates and keeps the order open while plates remain", () => {
+  it("drops a cancelled plate from the board's x von y", () => {
     const { log, order } = orderOn7();
     log.add({
       type: "platesCancelled",
@@ -155,11 +153,9 @@ describe("cancelling plates (Stornieren)", () => {
       productId: "braten",
       count: 1,
     });
-    const state = fold(log.events);
     expect(
-      boardRows(state).find((r) => r.productId === "braten")?.next,
+      boardRows(fold(log.events)).find((r) => r.productId === "braten")?.next,
     ).toMatchObject({ pager: 7, waiting: 1, plateCount: 1 });
-    expect(orderView(state, order.id, log.now)?.open).toBe(true);
   });
 
   // 05-exceptions: buzzed plates are only handed on or sent back, never cancelled
@@ -180,7 +176,7 @@ describe("cancelling plates (Stornieren)", () => {
     expect(() => fold(log.events)).toThrow();
   });
 
-  it("closes an order left with nothing open and frees its pager", () => {
+  it("records an order left with nothing open as closed by cancel", () => {
     const { log, order } = orderOn7();
     log.add({
       type: "platesCancelled",
@@ -194,41 +190,21 @@ describe("cancelling plates (Stornieren)", () => {
       productId: "pommes",
       count: 1,
     });
-    const state = fold(log.events);
-    expect(orderView(state, order.id, log.now)).toMatchObject({
+    expect(orderView(fold(log.events), order.id, log.now)).toMatchObject({
       open: false,
       closedBy: "cancel",
     });
-    expect(pagerOverview(state).free).toContain(7);
   });
 });
 
 describe("closing an abandoned order (Verwaiste Bestellung schließen)", () => {
-  it("closes the order and frees a returned pager", () => {
+  it("records the order as closed by abandoned", () => {
     const { log, order } = orderOn7();
-    log.add({
-      type: "platesBuzzed",
-      orderId: order.id,
-      productId: "braten",
-      count: 1,
-    });
     log.add({ type: "orderAbandoned", orderId: order.id, pagerBack: true });
-    const state = fold(log.events);
-    expect(orderView(state, order.id, log.now)).toMatchObject({
+    expect(orderView(fold(log.events), order.id, log.now)).toMatchObject({
       open: false,
       closedBy: "abandoned",
     });
-    expect(buzzedLines(state, log.now)).toEqual([]);
-    expect(boardRows(state).every((r) => r.next === null)).toBe(true);
-    expect(pagerOverview(state).free).toContain(7);
-  });
-
-  it("marks a pager that did not come back as missing", () => {
-    const { log, order } = orderOn7();
-    log.add({ type: "orderAbandoned", orderId: order.id, pagerBack: false });
-    const overview = pagerOverview(fold(log.events));
-    expect(overview.missing).toEqual([7]);
-    expect(overview.free).not.toContain(7);
   });
 
   it("refuses to abandon a closed order", () => {

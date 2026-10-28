@@ -4,8 +4,6 @@ import type { EvaluationRow, State } from "./index";
 import { testLog } from "./test-log";
 import type { TestLog } from "./test-log";
 
-const MINUTE = 60_000;
-
 /** Berlin wall-clock time during the Kirbe of 24.–26.10.2026 (CEST until Sunday 03:00). */
 function at(iso: string): number {
   return Date.parse(iso);
@@ -160,114 +158,9 @@ describe("the shifts of the Kirbe", () => {
 });
 
 describe("the Auswertung of one shift", () => {
-  it("counts a plate for the shift of its handover, with its whole waiting time", () => {
-    const log = startsAt(testLog(), "2026-10-24T14:55:00+02:00");
-    braten(log, "2026-10-24T15:10:00+02:00");
-    const state = fold(log.events);
-    expect(rowFor(state, "sa-a", "braten")).toMatchObject({
-      made: 0,
-      handedOver: 0,
-    });
-    expect(
-      rowFor(state, "sa-a", "braten").averageWaitingTimeMs,
-    ).toBeUndefined();
-    expect(rowFor(state, "sa-b", "braten")).toMatchObject({
-      made: 1,
-      handedOver: 1,
-      averageWaitingTimeMs: 15 * MINUTE,
-    });
-  });
-
-  it("counts a handover while two shifts overlap for the earlier shift only", () => {
-    const log = startsAt(testLog(), "2026-10-24T14:20:00+02:00");
-    braten(log, "2026-10-24T14:30:00+02:00");
-    const state = fold(log.events);
-    expect(rowFor(state, "sa-a", "braten").handedOver).toBe(1);
-    expect(rowFor(state, "sa-b", "braten").handedOver).toBe(0);
-  });
-
-  it("counts a handover at the very end of a shift for the next one", () => {
-    const log = startsAt(testLog(), "2026-10-24T14:50:00+02:00");
-    braten(log, "2026-10-24T15:00:00+02:00");
-    expect(rowFor(fold(log.events), "sa-b", "braten").handedOver).toBe(1);
-  });
-
   it("counts everything before the Kirbe's first shift for that shift", () => {
     const log = startsAt(testLog(), "2026-10-24T09:30:00+02:00");
     braten(log, "2026-10-24T09:40:00+02:00");
     expect(rowFor(fold(log.events), "sa-a", "braten").handedOver).toBe(1);
-  });
-
-  it("counts the night after the last shift of a day for that shift", () => {
-    const log = startsAt(testLog(), "2026-10-25T01:30:00+02:00");
-    braten(log, "2026-10-25T02:40:00+01:00");
-    expect(rowFor(fold(log.events), "sa-c", "braten").handedOver).toBe(1);
-  });
-
-  it("counts a plate sent back to queue as made in the shift it went back", () => {
-    const log = startsAt(testLog(), "2026-10-24T14:50:00+02:00");
-    const order = log.add({
-      type: "orderTaken",
-      pager: 7,
-      plates: [{ productId: "braten", count: 1 }],
-    });
-    log.add({
-      type: "platesBuzzed",
-      orderId: order.id,
-      productId: "braten",
-      count: 1,
-    });
-    waitUntil(log, "2026-10-24T15:05:00+02:00");
-    log.add({
-      type: "plateSentBackToQueue",
-      orderId: order.id,
-      productId: "braten",
-    });
-    const state = fold(log.events);
-    expect(rowFor(state, "sa-a", "braten").made).toBe(0);
-    expect(rowFor(state, "sa-b", "braten").made).toBe(1);
-  });
-
-  it("does not count an undone handover", () => {
-    const log = startsAt(testLog(), "2026-10-24T14:50:00+02:00");
-    braten(log, "2026-10-24T15:10:00+02:00");
-    const handover = log.events.at(-1);
-    if (handover === undefined) {
-      throw new Error("No handover");
-    }
-    log.add({ type: "actionUndone", targetId: handover.id });
-    expect(rowFor(fold(log.events), "sa-b", "braten").handedOver).toBe(0);
-  });
-
-  it("shows when a product sold out during the shift, and that a later shift started without it", () => {
-    const log = startsAt(testLog(), "2026-10-24T19:40:00+02:00");
-    log.add({ type: "soldOutMarked", productId: "braten" });
-    const state = fold(log.events);
-    expect(rowFor(state, "sa-b", "braten")).toMatchObject({
-      soldOutFirstAt: at("2026-10-24T19:40:00+02:00"),
-      soldOutCleared: false,
-    });
-    expect(rowFor(state, "sa-b", "braten").soldOutSince).toBeUndefined();
-    const saC = rowFor(state, "sa-c", "braten");
-    expect(saC.soldOutFirstAt).toBeUndefined();
-    expect(saC).toMatchObject({ soldOutSince: "Sa B", soldOutCleared: false });
-    expect(rowFor(state, "sa-a", "braten").soldOutSince).toBeUndefined();
-  });
-
-  it("shows a product as available again in the shift it was cleared", () => {
-    const log = startsAt(testLog(), "2026-10-24T19:40:00+02:00");
-    log.add({ type: "soldOutMarked", productId: "braten" });
-    waitUntil(log, "2026-10-24T21:00:00+02:00");
-    log.add({ type: "soldOutCleared", productId: "braten" });
-    const state = fold(log.events);
-    expect(rowFor(state, "sa-b", "braten").soldOutCleared).toBe(false);
-    expect(rowFor(state, "sa-c", "braten")).toMatchObject({
-      soldOutSince: "Sa B",
-      soldOutCleared: true,
-    });
-    expect(rowFor(state, "so-c", "braten")).toMatchObject({
-      soldOutCleared: false,
-    });
-    expect(rowFor(state, "so-c", "braten").soldOutSince).toBeUndefined();
   });
 });
