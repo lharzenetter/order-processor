@@ -1,6 +1,5 @@
 import { scenario } from "../scenario";
 
-// #18
 scenario(
   "closing an abandoned order with its pager back frees the pager",
   async ({ staff, see }) => {
@@ -16,7 +15,6 @@ scenario(
   },
 );
 
-// #18
 scenario(
   "closing an abandoned order without its pager marks the pager missing",
   async ({ staff, see }) => {
@@ -27,7 +25,6 @@ scenario(
   },
 );
 
-// #18
 scenario(
   "a pager marked missing is free again once restored",
   async ({ staff, see }) => {

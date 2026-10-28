@@ -1,6 +1,5 @@
 import { scenario } from "../scenario";
 
-// #19
 scenario(
   "with nothing done yet, Rückgängig has nothing to undo",
   async ({ see }) => {
@@ -8,7 +7,6 @@ scenario(
   },
 );
 
-// #19
 scenario("Rückgängig names the newest action", async ({ staff, see }) => {
   await staff.takeOrder({ pager: 7, plates: { braten: 1 } });
   await see.undo().offers("Neue Bestellung 1× Braten → Pager 7");
@@ -58,7 +56,6 @@ scenario(
   },
 );
 
-// 05-exceptions
 scenario(
   "undoing an order on a missing pager marks the pager missing again",
   async ({ staff, see }) => {

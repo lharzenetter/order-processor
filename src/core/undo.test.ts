@@ -1,9 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { describeEvent, fold } from "./index";
+import { describeEvent, fold, undoTarget } from "./index";
 import type { EventBody } from "./index";
 import { testLog } from "./test-log";
 
 describe("Rückgängig", () => {
+  // 05-exceptions: one undo stack, newest first, no time limit
+  it("takes actions back by appending actionUndone, never by deleting them from the log", () => {
+    const log = testLog();
+    const order = log.add({
+      type: "orderTaken",
+      pager: 7,
+      plates: [{ productId: "braten", count: 2 }],
+    });
+    const buzz = log.add({
+      type: "platesBuzzed",
+      orderId: order.id,
+      productId: "braten",
+      count: 2,
+    });
+    const undoBuzz = log.add({ type: "actionUndone", targetId: buzz.id });
+    expect(fold([order, buzz, undoBuzz]).live).toEqual([order]);
+
+    log.wait(24 * 60 * 60_000);
+    const undoOrder = log.add({ type: "actionUndone", targetId: order.id });
+    const state = fold([order, buzz, undoBuzz, undoOrder]);
+    expect(state.live).toEqual([]);
+    expect(undoTarget(state)).toBeNull();
+    // The undos only name their targets, so the fold still needs the actions they took back.
+    expect(() => fold([undoBuzz, undoOrder])).toThrow();
+  });
+
   it("refuses to undo anything but the current target", () => {
     const log = testLog();
     const first = log.add({ type: "pagerMarkedMissing", pager: 3 });
