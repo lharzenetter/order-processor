@@ -34,7 +34,7 @@ Playwright, ESLint + Prettier.
   Its entry points: `server/index.ts` (the `Request → Response` handler and the broadcast hook),
   `server/main.ts` (the only file that listens, and with the healthcheck the only one that reads
   `process.env`) and `server/healthcheck.ts` (a separate program the container runs).
-- `contract/` and `e2e/` are test-only and exempt from the layer boundaries.
+- `contract/`, `acceptance/` and `e2e/` are test-only and exempt from the layer boundaries.
 - Enforcement: ESLint `no-restricted-imports` per folder, and `tsconfig.pure.json` for `core`
   with `lib: ["ES2022"]` and no `DOM`. `server/` gets `globals.node`, no React hooks plugin, and
   `tsconfig.server.json` (`lib: ["ES2023"]`, no `DOM`, `module: "nodenext"`,
@@ -67,6 +67,13 @@ Playwright, ESLint + Prettier.
 ## Testing
 
 - `core/` is written test-first (red, green) for every behaviour change.
+- A use case is stated once, as a scenario in `acceptance/scenarios/`, through
+  `{ staff, see, time }`. Core tests cover reducer and selector detail only.
+- Double loop: new behaviour starts with a failing scenario that cites its ticket (`// #42`), then
+  the red/green loop in `src/core/`.
+- A scenario names steps and observations with `CONTEXT.md` terms, imports no runner, and observes
+  only what window staff can see. A rule the screen can't show belongs in a core test.
+- Every step and observation is async, so a UI driver can run the same scenario.
 - Tests drive the public API only: a list of stamped events, `fold`, and selectors at a `now`.
   `storage/` is tested through `openDeviceStore` with `fake-indexeddb`.
 - No real timers. Test names describe behaviour in glossary language.
