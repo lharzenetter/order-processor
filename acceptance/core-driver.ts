@@ -1,7 +1,9 @@
 import {
   acceptsIntake,
+  boardRows,
   buzzedLines,
   fold,
+  handOnTarget,
   labelOf,
   nextOrderFor,
   openOrderByPager,
@@ -18,7 +20,33 @@ import type {
   ProductId,
   State,
 } from "../src/core";
-import type { BuzzedLineSeen, LineSeen, Plates, Window } from "./window";
+import type {
+  BuzzedLineRef,
+  BuzzedLineSeen,
+  Duration,
+  LineSeen,
+  Plates,
+  Window,
+} from "./window";
+
+/** A line of the buzzed list as staff read it. */
+interface BuzzedRow {
+  readonly pager: number;
+  readonly product: ProductId;
+  readonly plates: number;
+  readonly sinceMs: number;
+  readonly rebuzzDue: boolean;
+}
+
+function msOf({ minutes = 0, seconds = 0 }: Duration): number {
+  return (minutes * 60 + seconds) * 1000;
+}
+
+/** "4:05", as the buzzed list's clock reads; the screen drops part-seconds. */
+function clockOf(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 // Samstag 10:00 comes with the evaluation scenarios (#20); until then any fixed instant will do.
 const START_AT = 1_760_000_000_000;
@@ -90,24 +118,75 @@ export function coreWindow(): Window {
 
   function describeBuzzed(line: BuzzedLineSeen): string {
     const plates = line.plates === undefined ? "" : ` ×${String(line.plates)}`;
-    return `pager ${String(line.pager)} ${labelOf(line.product)}${plates}`;
+    const since =
+      line.since === undefined ? "" : ` since ${clockOf(msOf(line.since))}`;
+    return `pager ${String(line.pager)} ${labelOf(line.product)}${plates}${since}`;
   }
 
-  function buzzedListRows(): readonly Required<BuzzedLineSeen>[] {
+  function describeRow(row: BuzzedRow): string {
+    return describeBuzzed({ ...row, since: { seconds: row.sinceMs / 1000 } });
+  }
+
+  function buzzedListRows(): readonly BuzzedRow[] {
     return buzzedLines(state, now).map((l) => ({
       pager: l.pager,
       // The selector widens ids to string; a scenario only compares them.
       product: l.productId as ProductId,
       plates: l.buzzed,
+      sinceMs: l.sinceBuzzMs,
+      rebuzzDue: l.rebuzzDue,
     }));
   }
 
-  function matches(row: BuzzedLineSeen, want: BuzzedLineSeen): boolean {
+  function matches(row: BuzzedRow, want: BuzzedLineSeen): boolean {
     return (
       row.pager === want.pager &&
       row.product === want.product &&
-      (want.plates === undefined || row.plates === want.plates)
+      (want.plates === undefined || row.plates === want.plates) &&
+      (want.since === undefined ||
+        clockOf(row.sinceMs) === clockOf(msOf(want.since)))
     );
+  }
+
+  function buzzedRow({ pager, product }: BuzzedLineRef): BuzzedRow {
+    const row = buzzedListRows().find(
+      (r) => r.pager === pager && r.product === product,
+    );
+    if (row === undefined) {
+      throw new Error(
+        `the buzzed list has no line for pager ${String(pager)} ${labelOf(product)}`,
+      );
+    }
+    return row;
+  }
+
+  function buzzedOf(pager: number, product: ProductId): number {
+    return linesOf(pager).find((l) => l.productId === product)?.buzzed ?? 0;
+  }
+
+  /** Who the "Weitergeben" button names, or why the popup offers none. */
+  function handOnTo(pager: number, product: ProductId): Order | string {
+    if (buzzedOf(pager, product) === 0) {
+      return `pager ${String(pager)} has no ${labelOf(product)} buzzed`;
+    }
+    return (
+      handOnTarget(state, openOrder(pager).id, product) ??
+      `nobody else waits for ${labelOf(product)}`
+    );
+  }
+
+  function boardRow(product: ProductId) {
+    const row = boardRows(state).find((r) => r.productId === product);
+    if (row === undefined) {
+      throw new Error(`the board has no row for ${labelOf(product)}`);
+    }
+    return row;
+  }
+
+  function pagersText(pagers: readonly number[]): string {
+    return pagers.length === 0
+      ? "nobody"
+      : `pager ${pagers.map(String).join(", ")}`;
   }
 
   function offersBuzz(order: Order, productId: ProductId): boolean {
@@ -182,6 +261,43 @@ export function coreWindow(): Window {
         });
         return Promise.resolve();
       },
+      handOn({ from, product }) {
+        const target = handOnTo(from, product);
+        if (typeof target === "string") {
+          throw new Error(
+            `the order popup for pager ${String(from)} offers no "${labelOf(product)} weitergeben": ${target}`,
+          );
+        }
+        append({
+          type: "plateHandedOn",
+          fromOrderId: openOrder(from).id,
+          toOrderId: target.id,
+          productId: product,
+        });
+        return Promise.resolve();
+      },
+      sendBackToQueue({ pager, product }) {
+        if (buzzedOf(pager, product) === 0) {
+          throw new Error(
+            `the order popup for pager ${String(pager)} offers no "${labelOf(product)} zurück in Warteschlange": none is buzzed`,
+          );
+        }
+        append({
+          type: "plateSentBackToQueue",
+          orderId: openOrder(pager).id,
+          productId: product,
+        });
+        return Promise.resolve();
+      },
+      rebuzz(line) {
+        buzzedRow(line);
+        append({
+          type: "rebuzzed",
+          orderId: openOrder(line.pager).id,
+          productId: line.product,
+        });
+        return Promise.resolve();
+      },
     },
     see: {
       order({ pager }) {
@@ -206,6 +322,15 @@ export function coreWindow(): Window {
             if (beyondStepper(pager, plates) === null) {
               throw new Error(
                 `expected the Ausgabe for pager ${String(pager)} to stop short, but it allows every plate`,
+              );
+            }
+            return Promise.resolve();
+          },
+          cannotHandOn(product) {
+            const target = handOnTo(pager, product);
+            if (typeof target !== "string") {
+              throw new Error(
+                `expected the order popup for pager ${String(pager)} to offer no "${labelOf(product)} weitergeben", but it hands on to pager ${String(target.pager)}`,
               );
             }
             return Promise.resolve();
@@ -239,15 +364,16 @@ export function coreWindow(): Window {
               });
             if (!same) {
               throw new Error(
-                `expected the buzzed list to list ${lines.map(describeBuzzed).join(", ") || "nothing"}, but it lists ${rows.map(describeBuzzed).join(", ") || "nothing"}`,
+                `expected the buzzed list to list ${lines.map(describeBuzzed).join(", ") || "nothing"}, but it lists ${rows.map(describeRow).join(", ") || "nothing"}`,
               );
             }
             return Promise.resolve();
           },
           includes(line) {
-            if (!buzzedListRows().some((row) => matches(row, line))) {
+            const rows = buzzedListRows();
+            if (!rows.some((row) => matches(row, line))) {
               throw new Error(
-                `expected the buzzed list to include ${describeBuzzed(line)}, but it does not`,
+                `expected the buzzed list to include ${describeBuzzed(line)}, but it lists ${rows.map(describeRow).join(", ") || "nothing"}`,
               );
             }
             return Promise.resolve();
@@ -256,7 +382,62 @@ export function coreWindow(): Window {
             const rows = buzzedListRows();
             if (rows.length > 0) {
               throw new Error(
-                `expected the buzzed list to be empty, but it lists ${rows.map(describeBuzzed).join(", ")}`,
+                `expected the buzzed list to be empty, but it lists ${rows.map(describeRow).join(", ")}`,
+              );
+            }
+            return Promise.resolve();
+          },
+          rebuzzDueFor(line) {
+            const row = buzzedRow(line);
+            if (!row.rebuzzDue) {
+              throw new Error(
+                `expected a re-buzz to be due for ${describeBuzzed(line)}, but its clock reads ${clockOf(row.sinceMs)}`,
+              );
+            }
+            return Promise.resolve();
+          },
+          noRebuzzDueFor(line) {
+            const row = buzzedRow(line);
+            if (row.rebuzzDue) {
+              throw new Error(
+                `expected no re-buzz to be due for ${describeBuzzed(line)}, but its clock reads ${clockOf(row.sinceMs)}`,
+              );
+            }
+            return Promise.resolve();
+          },
+        };
+      },
+      board(product) {
+        const label = labelOf(product);
+        return {
+          has({ next, queued }) {
+            const row = boardRow(product);
+            if (next !== undefined && row.next?.pager !== next) {
+              throw new Error(
+                `expected the board to show pager ${String(next)} next for ${label}, but ${
+                  row.next === null
+                    ? "nobody waits"
+                    : `it shows pager ${String(row.next.pager)}`
+                }`,
+              );
+            }
+            const behind = row.queued.map((q) => q.pager);
+            if (
+              queued !== undefined &&
+              (behind.length !== queued.length ||
+                queued.some((pager, i) => behind[i] !== pager))
+            ) {
+              throw new Error(
+                `expected the board to queue ${pagersText(queued)} behind for ${label}, but it queues ${pagersText(behind)}`,
+              );
+            }
+            return Promise.resolve();
+          },
+          nobodyWaits() {
+            const { next } = boardRow(product);
+            if (next !== null) {
+              throw new Error(
+                `expected nobody to wait for ${label} on the board, but pager ${String(next.pager)} is next`,
               );
             }
             return Promise.resolve();
@@ -279,8 +460,8 @@ export function coreWindow(): Window {
       },
     },
     time: {
-      passes({ minutes = 0, seconds = 0 }) {
-        now += (minutes * 60 + seconds) * 1000;
+      passes(duration) {
+        now += msOf(duration);
         return Promise.resolve();
       },
     },

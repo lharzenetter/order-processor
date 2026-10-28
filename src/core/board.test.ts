@@ -28,47 +28,14 @@ describe("the board (Übersicht)", () => {
     expect(rowFor(state, "braten").next).toBeNull();
   });
 
-  // 04-allocation-and-handover-rules: FIFO per product
-  it("shows the oldest open order still waiting for each product as next", () => {
-    const log = testLog();
-    log.add({
-      type: "orderTaken",
-      pager: 12,
-      plates: [{ productId: "braten", count: 2 }],
-    });
-    log.add({
-      type: "orderTaken",
-      pager: 5,
-      plates: [
-        { productId: "pommes", count: 1 },
-        { productId: "braten", count: 1 },
-      ],
-    });
-    const state = fold(log.events);
-
-    expect(rowFor(state, "braten").next).toMatchObject({
-      pager: 12,
-      calledCount: 0,
-      plateCount: 2,
-      waiting: 2,
-    });
-    expect(rowFor(state, "braten").queued).toEqual([
-      { orderId: "e2", pager: 5, waiting: 1 },
-    ]);
-    expect(rowFor(state, "pommes").next).toMatchObject({ pager: 5 });
-    expect(nextOrderFor(state, "braten")?.pager).toBe(12);
-    expect(nextOrderFor(state, "braten", "e1")?.pager).toBe(5);
-    expect(nextOrderFor(state, "maultaschen")).toBeNull();
-  });
-
-  it("keeps the next order at the top until all its plates of that product are buzzed", () => {
+  it("counts the next order's x von y gerufen and each queued order's waiting plates", () => {
     const log = testLog();
     const first = log.add({
       type: "orderTaken",
       pager: 12,
       plates: [{ productId: "braten", count: 2 }],
     });
-    log.add({
+    const second = log.add({
       type: "orderTaken",
       pager: 5,
       plates: [{ productId: "braten", count: 1 }],
@@ -79,22 +46,20 @@ describe("the board (Übersicht)", () => {
       productId: "braten",
       count: 1,
     });
-    expect(rowFor(fold(log.events), "braten").next).toMatchObject({
+    const state = fold(log.events);
+
+    expect(rowFor(state, "braten").next).toMatchObject({
+      orderId: first.id,
       pager: 12,
       calledCount: 1,
       plateCount: 2,
       waiting: 1,
     });
-
-    log.add({
-      type: "platesBuzzed",
-      orderId: first.id,
-      productId: "braten",
-      count: 1,
-    });
-    const state = fold(log.events);
-    expect(rowFor(state, "braten").next).toMatchObject({ pager: 5 });
-    expect(rowFor(state, "braten").queued).toEqual([]);
+    expect(rowFor(state, "braten").queued).toEqual([
+      { orderId: second.id, pager: 5, waiting: 1 },
+    ]);
+    expect(nextOrderFor(state, "braten", first.id)?.pager).toBe(5);
+    expect(nextOrderFor(state, "maultaschen")).toBeNull();
   });
 
   it("marks a sold-out product's row", () => {

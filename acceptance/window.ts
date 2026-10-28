@@ -15,6 +15,18 @@ export interface Staff {
     count?: number | "all";
   }): Promise<void>;
   handOver(handover: { pager: number; plates: Plates }): Promise<void>;
+  /** "Weitergeben" in the order popup: one buzzed plate goes to whoever the button names. */
+  handOn(handOn: { from: number; product: ProductId }): Promise<void>;
+  /** "Zurück in Warteschlange" in the order popup: one buzzed plate. */
+  sendBackToQueue(line: { pager: number; product: ProductId }): Promise<void>;
+  /** "Nochmal rufen" on the line in the buzzed list. */
+  rebuzz(line: { pager: number; product: ProductId }): Promise<void>;
+}
+
+/** A span of time as staff read it on a clock, "m:ss"; compared exactly (#8). */
+export interface Duration {
+  minutes?: number;
+  seconds?: number;
 }
 
 /** A line as the order popup shows it; fields left out are not checked (#7). */
@@ -32,6 +44,8 @@ export interface OrderSeen {
   cannotBuzz(product: ProductId): Promise<void>;
   /** The Ausgabe stepper stops short of these plates. */
   cannotHandOver(plates: Plates): Promise<void>;
+  /** The order popup offers no "Weitergeben" for this product, or only disabled. */
+  cannotHandOn(product: ProductId): Promise<void>;
 }
 
 export interface PagerSeen {
@@ -44,6 +58,14 @@ export interface BuzzedLineSeen {
   pager: number;
   product: ProductId;
   plates?: number;
+  /** The clock on the line: the time since its buzz. */
+  since?: Duration;
+}
+
+/** A line of the buzzed list, named by its pager and product. */
+export interface BuzzedLineRef {
+  pager: number;
+  product: ProductId;
 }
 
 export interface BuzzedListSeen {
@@ -51,6 +73,20 @@ export interface BuzzedListSeen {
   lists(lines: readonly BuzzedLineSeen[]): Promise<void>;
   includes(line: BuzzedLineSeen): Promise<void>;
   isEmpty(): Promise<void>;
+  /** The line is highlighted: "nochmal rufen". */
+  rebuzzDueFor(line: BuzzedLineRef): Promise<void>;
+  noRebuzzDueFor(line: BuzzedLineRef): Promise<void>;
+}
+
+/** A product's row on the board (Übersicht). */
+export interface BoardRowSeen {
+  /**
+   * Partial: `next` is the pager on "Pager N rufen", `queued` the pagers behind it
+   * ("danach"), exact and in FIFO order.
+   */
+  has(row: { next?: number; queued?: readonly number[] }): Promise<void>;
+  /** The row reads "niemand wartet". */
+  nobodyWaits(): Promise<void>;
 }
 
 export interface IntakeSeen {
@@ -64,11 +100,12 @@ export interface See {
   order(order: { pager: number }): OrderSeen;
   pager(pager: number): PagerSeen;
   buzzedList(): BuzzedListSeen;
+  board(product: ProductId): BoardRowSeen;
   intake(): IntakeSeen;
 }
 
 export interface Time {
-  passes(duration: { minutes?: number; seconds?: number }): Promise<void>;
+  passes(duration: Duration): Promise<void>;
 }
 
 export interface Window {
