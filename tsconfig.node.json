@@ -8,5 +8,11 @@
     // contract/ drives the real server/ handler, whose imports end in `.ts`.
     "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "e2e", "contract"]
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "e2e",
+    "contract",
+    "acceptance"
+  ]
 }

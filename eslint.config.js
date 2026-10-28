@@ -172,7 +172,12 @@ export default defineConfig(
     },
   },
   {
-    files: ["**/*.test.{ts,tsx}", "e2e/**/*.ts", "contract/**/*.ts"],
+    files: [
+      "**/*.test.{ts,tsx}",
+      "e2e/**/*.ts",
+      "contract/**/*.ts",
+      "acceptance/**/*.ts",
+    ],
     rules: { "@typescript-eslint/consistent-type-assertions": "off" },
   },
   {

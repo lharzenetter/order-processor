@@ -9,7 +9,7 @@ export interface Product {
 
 // Edited before a Fest and never during one. The array order is the display order: the fast dishes
 // first (decided in "Window screen prototype").
-export const MENU: readonly Product[] = [
+export const MENU = [
   {
     id: "flammkuchen",
     label: "Flammkuchen",
@@ -70,4 +70,6 @@ export const MENU: readonly Product[] = [
     menuName: "Fleischkäsbrötchen",
     preisschildPosition: 9,
   },
-];
+] as const satisfies readonly Product[];
+
+export type ProductId = (typeof MENU)[number]["id"];

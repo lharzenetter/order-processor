@@ -2,7 +2,7 @@ export { assertNever } from "./assert-never";
 export { describeEvent, platesText, undoTarget } from "./describe-event";
 export type { Event, EventBody, EventType, PlateCount, Stamp } from "./event";
 export { MENU } from "./menu";
-export type { Product } from "./menu";
+export type { Product, ProductId } from "./menu";
 export { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
 export { kirbeShifts } from "./kirbe-shifts";
 export type { Shift } from "./kirbe-shifts";

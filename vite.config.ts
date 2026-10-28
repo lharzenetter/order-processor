@@ -63,6 +63,7 @@ export default defineConfig(({ command, isPreview }) => ({
       "src/**/*.test.{ts,tsx}",
       "server/**/*.test.ts",
       "contract/**/*.test.ts",
+      "acceptance/**/*.test.ts",
     ],
   },
 }));
