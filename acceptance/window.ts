@@ -5,8 +5,8 @@ import type { ProductId } from "../src/core";
 /** Plates per product, as on a meal voucher or in the Ausgabe stepper. */
 export type Plates = Partial<Readonly<Record<ProductId, number>>>;
 
-/** What window staff do. Each step names an order by its pager only (#6). */
-export interface Staff {
+/** What window staff do on one iPad. Each step names an order by its pager only (#6). */
+export interface Steps {
   takeOrder(order: { pager: number; plates: Plates }): Promise<void>;
   /** One plate per tap on "Pager N rufen", or every waiting plate with "Alle". */
   buzz(buzz: {
@@ -37,6 +37,16 @@ export interface Staff {
   markPagerMissing(pager: number): Promise<void>;
   /** Taps a missing (dashed) pager in intake's "Pager fehlt…" mode. */
   restorePager(pager: number): Promise<void>;
+  /** "Rückgängig" in the header: takes back whatever its subline names. */
+  undo(): Promise<void>;
+}
+
+/**
+ * Steps on the one standalone iPad by default. `ipad(name)` acts on the same shared log, stamped
+ * with that device name; the sync protocol stays out of scenarios (#6).
+ */
+export interface Staff extends Steps {
+  ipad(deviceName: string): Steps;
 }
 
 /** A span of time as staff read it on a clock, "m:ss"; compared exactly (#8). */
@@ -147,6 +157,14 @@ export interface IntakeSeen {
   noSoldOutWarningFor(product: ProductId): Promise<void>;
 }
 
+/** The Rückgängig button in the header. */
+export interface UndoSeen {
+  /** Exact: the button's subline, as on screen, with "(device name)" for a named iPad. */
+  offers(label: string): Promise<void>;
+  /** The button is disabled: "nichts rückgängig zu machen". */
+  offersNothing(): Promise<void>;
+}
+
 /** What window staff see. Nothing here reaches past the screen (#7). */
 export interface See {
   /** The open order on this pager, as the Ausgabe popup shows it. */
@@ -158,6 +176,7 @@ export interface See {
   soldOut(product: ProductId): SoldOutSeen;
   openOrdersList(): OpenOrdersListSeen;
   intake(): IntakeSeen;
+  undo(): UndoSeen;
 }
 
 export interface Time {

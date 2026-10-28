@@ -12,6 +12,7 @@ import {
   pagerCheck,
   pagerOverview,
   soldOutWaiting,
+  undoTarget,
 } from "../src/core";
 import type {
   Event,
@@ -30,6 +31,7 @@ import type {
   OpenOrderSeen,
   Plates,
   SoldOutOrderSeen,
+  Steps,
   Window,
 } from "./window";
 
@@ -61,9 +63,17 @@ export function coreWindow(): Window {
   let state: State = fold([]);
   let now = START_AT;
 
-  function append(body: EventBody): void {
+  /** Stamps the tap as the ui does: the device name only on a named iPad. */
+  function record(body: EventBody, device: string | undefined): void {
     const seq = events.length + 1;
-    const next = [...events, { ...body, id: `e${String(seq)}`, seq, at: now }];
+    const event: Event = {
+      ...body,
+      id: `e${String(seq)}`,
+      seq,
+      at: now,
+      ...(device === undefined ? {} : { device }),
+    };
+    const next = [...events, event];
     // A throw here means the driver let through a step the UI would not offer.
     state = fold(next);
     events.splice(0, events.length, ...next);
@@ -305,8 +315,12 @@ export function coreWindow(): Window {
     );
   }
 
-  return {
-    staff: {
+  /** The steps on one iPad; every iPad acts on the same shared log. */
+  function stepsOn(device: string | undefined): Steps {
+    function append(body: EventBody): void {
+      record(body, device);
+    }
+    return {
       takeOrder({ pager, plates }) {
         if (!acceptsIntake(pagerCheck(state, pager))) {
           throw new Error(
@@ -444,6 +458,27 @@ export function coreWindow(): Window {
         append({ type: "pagerRestored", pager });
         return Promise.resolve();
       },
+      undo() {
+        const target = undoTarget(state);
+        if (target === null) {
+          throw new Error(
+            "the Rückgängig button is disabled: there is nothing to undo",
+          );
+        }
+        append({ type: "actionUndone", targetId: target.event.id });
+        return Promise.resolve();
+      },
+    };
+  }
+
+  function undoLabel(): string | null {
+    return undoTarget(state)?.label ?? null;
+  }
+
+  return {
+    staff: {
+      ...stepsOn(undefined),
+      ipad: (deviceName) => stepsOn(deviceName),
     },
     see: {
       order({ pager }) {
@@ -691,6 +726,28 @@ export function coreWindow(): Window {
           acceptsPager: (pager) => check(pager, true),
           warnsSoldOut: (product) => warns(product, true),
           noSoldOutWarningFor: (product) => warns(product, false),
+        };
+      },
+      undo() {
+        return {
+          offers(label) {
+            const shown = undoLabel();
+            if (shown !== label) {
+              throw new Error(
+                `expected Rückgängig to name "${label}", but ${shown === null ? "there is nothing to undo" : `it names "${shown}"`}`,
+              );
+            }
+            return Promise.resolve();
+          },
+          offersNothing() {
+            const shown = undoLabel();
+            if (shown !== null) {
+              throw new Error(
+                `expected nothing to undo, but Rückgängig names "${shown}"`,
+              );
+            }
+            return Promise.resolve();
+          },
         };
       },
     },
