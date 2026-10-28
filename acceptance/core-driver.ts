@@ -7,9 +7,11 @@ import {
   labelOf,
   nextOrderFor,
   openOrderByPager,
+  openOrdersList,
   orderView,
   pagerCheck,
   pagerOverview,
+  soldOutWaiting,
 } from "../src/core";
 import type {
   Event,
@@ -25,7 +27,9 @@ import type {
   BuzzedLineSeen,
   Duration,
   LineSeen,
+  OpenOrderSeen,
   Plates,
+  SoldOutOrderSeen,
   Window,
 } from "./window";
 
@@ -175,12 +179,87 @@ export function coreWindow(): Window {
     );
   }
 
+  function waitingOf(pager: number, product: ProductId): number {
+    return linesOf(pager).find((l) => l.productId === product)?.waiting ?? 0;
+  }
+
   function boardRow(product: ProductId) {
     const row = boardRows(state).find((r) => r.productId === product);
     if (row === undefined) {
       throw new Error(`the board has no row for ${labelOf(product)}`);
     }
     return row;
+  }
+
+  function isSoldOut(product: ProductId): boolean {
+    // Intake and the board both read the sold-out mark; the board row is its selector.
+    return boardRow(product).soldOut;
+  }
+
+  function soldOutOrders(product: ProductId): readonly SoldOutOrderSeen[] {
+    const banner = soldOutWaiting(state).find((b) => b.productId === product);
+    if (banner === undefined) {
+      throw new Error(
+        `expected a sold-out banner for ${labelOf(product)}, but it is not sold out`,
+      );
+    }
+    return banner.orders.map((o) => ({ pager: o.pager, plates: o.waiting }));
+  }
+
+  function chipsText(orders: readonly SoldOutOrderSeen[]): string {
+    return orders.length === 0
+      ? "nobody"
+      : orders
+          .map(
+            ({ pager, plates }) =>
+              `pager ${String(pager)}${plates === undefined ? "" : ` ×${String(plates)}`}`,
+          )
+          .join(", ");
+  }
+
+  /** The list as staff read it: owed plates split into buzzed and the rest still waiting. */
+  function openOrdersRows(): readonly OpenOrderSeen[] {
+    return openOrdersList(state).map(({ pager, lines }) => ({
+      pager,
+      lines: Object.fromEntries(
+        lines.map((l) => [
+          l.productId,
+          { buzzed: l.buzzed, waiting: l.owed - l.buzzed },
+        ]),
+      ),
+    }));
+  }
+
+  function countsOf(
+    lines: OpenOrderSeen["lines"],
+    product: string,
+  ): readonly [number, number] {
+    const line = Object.entries(lines).find(([p]) => p === product)?.[1];
+    return [line?.buzzed ?? 0, line?.waiting ?? 0];
+  }
+
+  function sameOpenOrder(row: OpenOrderSeen, want: OpenOrderSeen): boolean {
+    const products = new Set([
+      ...Object.keys(row.lines),
+      ...Object.keys(want.lines),
+    ]);
+    return (
+      row.pager === want.pager &&
+      [...products].every((product) => {
+        const [buzzed, waiting] = countsOf(row.lines, product);
+        const [wantBuzzed, wantWaiting] = countsOf(want.lines, product);
+        return buzzed === wantBuzzed && waiting === wantWaiting;
+      })
+    );
+  }
+
+  function describeOpenOrder({ pager, lines }: OpenOrderSeen): string {
+    const owed = Object.entries(lines).map(([product, line]) => {
+      const buzzed = line.buzzed ?? 0;
+      const total = buzzed + (line.waiting ?? 0);
+      return `${String(total)}× ${labelOf(product)}${buzzed > 0 ? ` (${String(buzzed)} buzzed)` : ""}`;
+    });
+    return `pager ${String(pager)}: ${owed.join(", ")}`;
   }
 
   function pagersText(pagers: readonly number[]): string {
@@ -235,8 +314,7 @@ export function coreWindow(): Window {
               }`,
             );
           }
-          const waiting =
-            linesOf(pager).find((l) => l.productId === product)?.waiting ?? 0;
+          const waiting = waitingOf(pager, product);
           append({
             type: "platesBuzzed",
             orderId: order.id,
@@ -298,6 +376,40 @@ export function coreWindow(): Window {
         });
         return Promise.resolve();
       },
+      cancel({ pager, product, count }) {
+        for (let tap = 0; tap < count; tap++) {
+          if (waitingOf(pager, product) === 0) {
+            throw new Error(
+              `the order popup for pager ${String(pager)} offers no "1 ${labelOf(product)} stornieren": none is waiting`,
+            );
+          }
+          append({
+            type: "platesCancelled",
+            orderId: openOrder(pager).id,
+            productId: product,
+            count: 1,
+          });
+        }
+        return Promise.resolve();
+      },
+      markSoldOut(product) {
+        if (isSoldOut(product)) {
+          throw new Error(
+            `the Ausverkauft markieren dialog shows ${labelOf(product)} as sold out already: a tap would clear it`,
+          );
+        }
+        append({ type: "soldOutMarked", productId: product });
+        return Promise.resolve();
+      },
+      clearSoldOut(product) {
+        if (!isSoldOut(product)) {
+          throw new Error(
+            `the Ausverkauft markieren dialog shows ${labelOf(product)} as not sold out: a tap would mark it`,
+          );
+        }
+        append({ type: "soldOutCleared", productId: product });
+        return Promise.resolve();
+      },
     },
     see: {
       order({ pager }) {
@@ -331,6 +443,15 @@ export function coreWindow(): Window {
             if (typeof target !== "string") {
               throw new Error(
                 `expected the order popup for pager ${String(pager)} to offer no "${labelOf(product)} weitergeben", but it hands on to pager ${String(target.pager)}`,
+              );
+            }
+            return Promise.resolve();
+          },
+          cannotCancel(product) {
+            const waiting = waitingOf(pager, product);
+            if (waiting > 0) {
+              throw new Error(
+                `expected the order popup for pager ${String(pager)} to offer no "1 ${labelOf(product)} stornieren", but ${String(waiting)} ${waiting === 1 ? "is" : "are"} waiting`,
               );
             }
             return Promise.resolve();
@@ -442,6 +563,73 @@ export function coreWindow(): Window {
             }
             return Promise.resolve();
           },
+          isSoldOut() {
+            if (!isSoldOut(product)) {
+              throw new Error(
+                `expected the board to mark ${label} sold out, but it does not`,
+              );
+            }
+            return Promise.resolve();
+          },
+          isNotSoldOut() {
+            if (isSoldOut(product)) {
+              throw new Error(
+                `expected the board not to mark ${label} sold out, but it does`,
+              );
+            }
+            return Promise.resolve();
+          },
+        };
+      },
+      soldOut(product) {
+        const label = labelOf(product);
+        return {
+          lists(orders) {
+            const shown = soldOutOrders(product);
+            const same =
+              shown.length === orders.length &&
+              orders.every((want, i) => {
+                const chip = shown[i];
+                return (
+                  chip?.pager === want.pager &&
+                  (want.plates === undefined || chip.plates === want.plates)
+                );
+              });
+            if (!same) {
+              throw new Error(
+                `expected the ${label} sold-out banner to list ${chipsText(orders)}, but it lists ${chipsText(shown)}`,
+              );
+            }
+            return Promise.resolve();
+          },
+          nobodyWaits() {
+            const shown = soldOutOrders(product);
+            if (shown.length > 0) {
+              throw new Error(
+                `expected the ${label} sold-out banner to read "niemand wartet", but it lists ${chipsText(shown)}`,
+              );
+            }
+            return Promise.resolve();
+          },
+        };
+      },
+      openOrdersList() {
+        return {
+          lists(orders) {
+            const rows = openOrdersRows();
+            const same =
+              rows.length === orders.length &&
+              orders.every((want, i) => {
+                const row = rows[i];
+                return row !== undefined && sameOpenOrder(row, want);
+              });
+            if (!same) {
+              throw new Error(
+                `expected the Offene Bestellungen list to show ${orders.map(describeOpenOrder).join("; ") || "nothing"}, but it shows ${rows.map(describeOpenOrder).join("; ") || "nothing"}`,
+              );
+            }
+            return Promise.resolve();
+          },
         };
       },
       intake() {
@@ -453,9 +641,21 @@ export function coreWindow(): Window {
           }
           return Promise.resolve();
         }
+        function warns(product: ProductId, want: boolean): Promise<void> {
+          if (isSoldOut(product) !== want) {
+            throw new Error(
+              want
+                ? `expected intake to warn that ${labelOf(product)} is sold out, but it is not`
+                : `expected intake to take ${labelOf(product)} without a warning, but it is sold out`,
+            );
+          }
+          return Promise.resolve();
+        }
         return {
           refusesPager: (pager) => check(pager, false),
           acceptsPager: (pager) => check(pager, true),
+          warnsSoldOut: (product) => warns(product, true),
+          noSoldOutWarningFor: (product) => warns(product, false),
         };
       },
     },
