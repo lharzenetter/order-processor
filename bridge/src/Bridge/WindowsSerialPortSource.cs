@@ -43,8 +43,7 @@ public sealed partial class WindowsSerialPortSource : ISerialPortSource, IDispos
         {
             Handshake = Handshake.None,
             RtsEnable = true,
-            // .NET's infinite read timeout hands the driver values the CH340 handles badly; a finite one
-            // reads the TD186 on the hardware (tools/td186-test.ps1). An empty read is no failure.
+            // Wakes a blocking read on a quiet line, so a cancelled read ends within 500 ms.
             ReadTimeout = 500,
         };
         try
@@ -115,10 +114,29 @@ public sealed partial class WindowsSerialPortSource : ISerialPortSource, IDispos
         public override int Read(byte[] buffer, int offset, int count) => stream.Read(buffer, offset, count);
 
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-            stream.ReadAsync(buffer, offset, count, cancellationToken);
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
+        // Blocking reads on a pool thread: on the TD186's CH340, async reads return empty at once in a busy
+        // loop and fail now and then, while a blocking read with a timeout gets every heartbeat
+        // (tools/serial-read-probe.ps1, on the hardware 2026-11-10).
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-            stream.ReadAsync(buffer, cancellationToken);
+            new(Task.Run(() => ReadBlocking(buffer, cancellationToken), cancellationToken));
+
+        private int ReadBlocking(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    return stream.Read(buffer.Span);
+                }
+                catch (TimeoutException)
+                {
+                    // Nothing arrived within the read timeout; read again.
+                }
+            }
+        }
 
         public override void Write(byte[] buffer, int offset, int count) => stream.Write(buffer, offset, count);
 
