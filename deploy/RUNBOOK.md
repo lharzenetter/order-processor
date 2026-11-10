@@ -410,19 +410,32 @@ If it isn't fixed within a few minutes, **fall back to calling by hand**:
 
 ## 6. After the Fest
 
-Back up the log volume while the server is stopped:
+1. Back up the log volume while the server is stopped:
 
-```powershell
-cd C:\kirbe
-docker compose stop server
-docker compose cp server:/data "$HOME\kirbe-data-$(Get-Date -Format yyyy-MM-dd)"
-docker compose start server
-```
+   ```powershell
+   cd C:\kirbe
+   docker compose stop server
+   docker compose cp server:/data "$HOME\kirbe-data-$(Get-Date -Format yyyy-MM-dd)"
+   docker compose start server
+   ```
 
-Every file in the backup's `archive\` folder is a normal export and can go back onto an iPad with
-_Exportieren und importieren_. The archive is never pruned. Keep the backup off the PC, and pack
-the PC, the transmitter with its USB cable, the Ethernet cable and the FRITZ!Box config export into
-the kit.
+   Every file in the backup's `archive\` folder is a normal export and can go back onto an iPad with
+   _Exportieren und importieren_. The archive is never pruned. Keep the backup off the PC, and pack
+   the PC, the transmitter with its USB cable, the Ethernet cable and the FRITZ!Box config export into
+   the kit.
+
+2. Remove the Windows Firewall rule (open PowerShell **as administrator**):
+
+   ```powershell
+   Get-NetFirewallRule -Direction Inbound | Where-Object {$_.DisplayName -like "*kirbe*"} | Format-Table DisplayName, Enabled
+   Remove-NetFirewallRule -DisplayName "<exact name from list above>"
+   ```
+
+   Or delete by port if the rule name is unclear:
+
+   ```powershell
+   Remove-NetFirewallRule -DisplayName "kirbe server" -ErrorAction SilentlyContinue
+   ```
 
 ## 7. If the PC is lost
 
