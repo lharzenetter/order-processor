@@ -326,3 +326,8 @@ deploy/data/
 
 *.rar
 *.pdf
+
+# Pager bridge build output
+bridge/**/bin/
+bridge/**/obj/
+bridge/publish/

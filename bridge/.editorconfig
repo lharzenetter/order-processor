@@ -1,0 +1,8 @@
+root = false
+
+[*.cs]
+indent_size = 4
+
+# Test names are sentences in glossary language.
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
