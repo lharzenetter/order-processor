@@ -205,6 +205,10 @@ export function App() {
           board={board}
           device={device}
           showToast={showToast}
+          onTestCall={board.callPager}
+          onSwitchPagerCalls={(on) => {
+            void run({ type: "pagerCallsSwitched", on });
+          }}
         />
         <Toasts toasts={toasts} onDismiss={dismissToast} />
       </>
