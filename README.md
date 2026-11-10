@@ -2,11 +2,14 @@
 
 Offline web app for the kitchen window at the Kirbe of the Freiwillige Feuerwehr
 Degerloch-Hoffeld: window staff enter a meal voucher, attach a pager, see per dish which order is
-next (FIFO), buzz pagers by hand and hand over the plates. It runs on one landscape iPad, installed
-to the Home Screen from <https://lharzenetter.github.io/order-processor/>, and keeps everything on
-the device as an append-only event log. In sync mode several iPads share one log through a small
-server at the venue ([`deploy/RUNBOOK.md`](deploy/RUNBOOK.md)); a kitchen station can run one of
-them as a read-only _Küchenanzeige_ showing how many plates of its dishes are still waiting.
+next (FIFO), buzz pagers and hand over the plates. It runs on one landscape iPad, installed to
+the Home Screen from <https://lharzenetter.github.io/order-processor/>, and keeps everything on the
+device as an append-only event log. In sync mode several iPads share one log through a small
+server on the venue machine, a Windows PC, and a buzz calls the guest's pager by itself through
+the pager bridge and the TD186 transmitter plugged into that PC; a standalone iPad leaves calling
+to the transmitter's keypad. A kitchen station can run one of the iPads as a read-only
+_Küchenanzeige_ showing how many plates of its dishes are still waiting. Setting up and running the
+venue machine: [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md).
 
 ## Development
 
@@ -61,7 +64,7 @@ dotnet publish src/Bridge -c Release -r win-x64 --self-contained -p:PublishSingl
 ```
 
 On the venue machine, `deploy/install-bridge.ps1 -Version <version>` (as administrator) installs or
-updates the release's `order-processor-bridge-<version>.exe` as a service. It answers on
+updates the release's `order-processor-bridge-<version>.exe` as a service (runbook, section 1.8). It answers on
 `http://127.0.0.1:9186`: `GET /status` gives `{ "connected": true }`, and `POST /calls` with
 `{ "pager": 21 }` calls pager 21 and answers `{ "result": "ok" }`, `"failed"` or `"notConnected"`.
 
