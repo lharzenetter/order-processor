@@ -90,19 +90,24 @@ export function App() {
   // #23: the result arrives on its own, after the tap; Erneut senden repeats only the call.
   function showPagerCall(pager: number, result: PagerCallResult): void {
     const toast = pagerCallToast(pager, result);
-    showToast(toast.text, {
-      stays: toast.stays,
-      ...(toast.resend
+    showToast(
+      toast.text,
+      toast.stays
         ? {
-            action: {
-              label: "Erneut senden",
-              run: () => {
-                void board.callPager(pager);
-              },
-            },
+            stays: true,
+            ...(toast.resend
+              ? {
+                  action: {
+                    label: "Erneut senden",
+                    run: () => {
+                      void board.callPager(pager);
+                    },
+                  },
+                }
+              : {}),
           }
-        : {}),
-    });
+        : { stays: false },
+    );
   }
 
   // Every action goes through the log; a refused event is a bug, shown rather than swallowed.
