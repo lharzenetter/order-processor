@@ -4,17 +4,20 @@ import styles from "./Toasts.module.css";
 
 const TOAST_MS = 4_000;
 
-export interface ToastOptions {
-  /** Stays until tapped away instead of going away by itself. */
-  readonly stays?: boolean;
-  /** A button on the toast; tapping it also takes the toast away. */
-  readonly action?: { readonly label: string; readonly run: () => void };
-}
+/** Only a toast that stays carries an action: one that goes away by itself has no button. */
+export type ToastOptions =
+  | { readonly stays?: false }
+  | {
+      /** Stays until tapped away instead of going away by itself. */
+      readonly stays: true;
+      /** A button on the toast; tapping it also takes the toast away. */
+      readonly action?: { readonly label: string; readonly run: () => void };
+    };
 
-interface Toast extends ToastOptions {
+type Toast = ToastOptions & {
   readonly id: number;
   readonly text: string;
-}
+};
 
 export type ShowToast = (text: string, options?: ToastOptions) => void;
 
