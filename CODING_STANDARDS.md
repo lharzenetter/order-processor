@@ -5,7 +5,7 @@ Adapted from `lharzenetter/checkbox-similator`.
 
 Stack: TypeScript (strict) + Vite, a framework-free core, React UI, IndexedDB via `idb`,
 `vite-plugin-pwa`, a Node sync server on built-ins only (`node:https`, `node:sqlite`), pnpm, Vitest,
-Playwright, ESLint + Prettier.
+Playwright, ESLint + Prettier. The pager bridge is .NET 10 and C#, with xUnit.
 
 ## Naming
 
@@ -25,6 +25,7 @@ Playwright, ESLint + Prettier.
 | `storage/` | Event log in IndexedDB, export/import, clearing the log  | `core`     | yes          |
 | `ui/`      | React screens; `usePagerBoard()` owns state and dispatch | everything | yes          |
 | `server/`  | Sync API, the SQLite log, the archive and the env config | nothing    | Node only    |
+| `bridge/`  | Pager bridge: Windows service driving the transmitter    | nothing    | Windows only |
 
 - Imports point one way only, as in the table. Only `ui/` imports React.
 - `core/` has no DOM, no `Date.now()`, no timers and no randomness.
@@ -63,6 +64,28 @@ Playwright, ESLint + Prettier.
 - The clock is read only for archive names and pings.
 - Never log the pairing code or a query string: a log line holds at most method, path and status.
 - Every existing rule applies to `server/` unchanged.
+
+## The pager bridge
+
+- `bridge/` is a .NET solution of its own, outside `src/` and `server/`, importing neither and
+  imported by neither. `src/Bridge/` is the service, `tests/Bridge.Tests/` its xUnit tests. Run
+  `dotnet` inside `bridge/`, so it reads `global.json`.
+- It knows pager calls and the transmitter only, never orders or events. The server reaches it over
+  plain HTTP on port 9186, bound to loopback and the Docker adapter only.
+- The TD186 protocol lives in `Frames.cs`; each rule cites the spec (#23, TD186 protocol). The
+  System ID is learned from the heartbeat, never configured.
+- Windows APIs (WMI, `System.IO.Ports`, the event log) stay in `WindowsSerialPortSource` behind
+  `ISerialPortSource`, and in `Program.cs`, so the rest builds and tests on any OS.
+- Time comes from an injected `TimeProvider`, never `DateTime.Now` or a bare `Task.Delay`.
+- C# conventions: nullable on, warnings as errors, the recommended analyzers, file-scoped
+  namespaces, files named after their main type, `PascalCase` types and members, `camelCase` locals
+  and private fields. Logging goes through `[LoggerMessage]` methods.
+- Tests are written test-first at two seams: the protocol through a fake serial stream
+  (`TransmitterSession`) and discovery through a fake port source (`Transmitter`), on a
+  `FakeTimeProvider`, with no real waits. Test names are sentences with underscores. The HTTP
+  endpoints and the Windows service are checked by hand on the hardware.
+- CI tests and publishes it on `windows-latest`; a release attaches
+  `order-processor-bridge-<version>.exe` with the server image's version.
 
 ## Testing
 

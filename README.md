@@ -47,5 +47,23 @@ pnpm build && pnpm preview --port 4173  # the only origin the local server accep
   `{"connected":false}`); `-d '{}'` resets it.
 - Every start of the server begins with an empty log.
 
+### Pager bridge
+
+`bridge/` is a separate .NET 10 program, the pager bridge: a Windows service on the venue machine
+that calls pagers on the TD186 transmitter over USB, for the server. It needs the
+[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and runs on Windows only; its tests
+run anywhere. Run the commands in `bridge/`, so `dotnet` reads its `global.json`:
+
+```sh
+cd bridge
+dotnet test       # protocol and discovery (xUnit, fake serial ports)
+dotnet publish src/Bridge -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+```
+
+On the venue machine, `deploy/install-bridge.ps1 -Version <version>` (as administrator) installs or
+updates the release's `order-processor-bridge-<version>.exe` as a service. It answers on
+`http://127.0.0.1:9186`: `GET /status` gives `{ "connected": true }`, and `POST /calls` with
+`{ "pager": 21 }` calls pager 21 and answers `{ "result": "ok" }`, `"failed"` or `"notConnected"`.
+
 The menu is `src/core/menu.ts`; edit it before a Fest, never during one.
 Glossary: [`CONTEXT.md`](CONTEXT.md). Coding standards: [`CODING_STANDARDS.md`](CODING_STANDARDS.md).

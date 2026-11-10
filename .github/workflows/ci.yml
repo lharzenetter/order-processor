@@ -34,6 +34,19 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
 
+  bridge:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: bridge/global.json
+      # From bridge/, so dotnet test reads its global.json and runs Microsoft.Testing.Platform.
+      - run: dotnet test --project tests/Bridge.Tests
+        working-directory: bridge
+      - run: dotnet publish src/Bridge -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+        working-directory: bridge
+
   server-image:
     runs-on: ubuntu-latest
     env:
@@ -74,7 +87,7 @@ jobs:
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [check, e2e, server-image]
+    needs: [check, e2e, bridge, server-image]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -157,3 +170,33 @@ jobs:
           platforms: linux/arm64,linux/amd64
           push: true
           tags: ghcr.io/lharzenetter/order-processor-server:${{ steps.version.outputs.version }}
+
+  # Every release carries the pager bridge with the same version as the server image (#23).
+  bridge-exe:
+    if: needs.release.outputs.published == 'true'
+    needs: release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: bridge/global.json
+      - id: version
+        shell: bash
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+      - run: >-
+          dotnet publish src/Bridge -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -p:Version=${{ steps.version.outputs.version }} -o publish
+        working-directory: bridge
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cp bridge/publish/order-processor-bridge.exe "order-processor-bridge-$VERSION.exe"
+          gh release upload "v$VERSION" "order-processor-bridge-$VERSION.exe"
