@@ -44,3 +44,7 @@ nothing about pagers, now relays pager calls (it still knows nothing about order
 - **A PowerShell bridge.** Rejected as too fragile for a service that must run unattended all Fest.
 - **Node with built-ins only.** Rejected: no reliable serial access (baud rate, RTS) without a
   native library.
+
+## More Information
+
+Spec: [#23](https://github.com/lharzenetter/order-processor/issues/23).
