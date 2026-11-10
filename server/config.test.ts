@@ -35,9 +35,35 @@ describe("readConfig", () => {
         keyFile: "/certs/kirbe.key",
         dataDir: "/data",
         port: 8443,
+        bridgeUrl: "http://host.docker.internal:9186",
         cert: Buffer.from("CERT"),
         key: Buffer.from("KEY"),
       },
+    });
+  });
+
+  it("takes the bridge from BRIDGE_URL", () => {
+    // #26
+    const result = readConfig(
+      { ...VALID_ENV, BRIDGE_URL: "http://127.0.0.1:9186" },
+      readFile,
+    );
+
+    expect(result.ok && result.config.bridgeUrl).toBe("http://127.0.0.1:9186");
+  });
+
+  it("refuses a BRIDGE_URL that is not an http URL", () => {
+    // #26
+    const result = readConfig(
+      { ...VALID_ENV, BRIDGE_URL: "host.docker.internal:9186" },
+      readFile,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      problems: [
+        "BRIDGE_URL must be an http URL like http://host.docker.internal:9186.",
+      ],
     });
   });
 

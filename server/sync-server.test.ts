@@ -33,6 +33,48 @@ afterEach(() => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
+interface BridgeRequest {
+  readonly method: string;
+  readonly url: string;
+  readonly body: unknown;
+}
+
+/** A pager bridge double: answers as told, or never, or is unreachable. */
+function fakeBridge() {
+  const requests: BridgeRequest[] = [];
+  let answer: (() => Response) | "unreachable" | "silent" = () =>
+    Response.json({ result: "ok" });
+  function bridgeFetch(input: string, init: RequestInit = {}) {
+    const body: unknown =
+      typeof init.body === "string" ? JSON.parse(init.body) : undefined;
+    requests.push({ method: init.method ?? "GET", url: input, body });
+    if (answer === "unreachable") {
+      return Promise.reject(new TypeError("fetch failed"));
+    }
+    if (answer === "silent") {
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    }
+    return Promise.resolve(answer());
+  }
+  return {
+    requests,
+    bridgeFetch,
+    answer(next: () => Response) {
+      answer = next;
+    },
+    goUnreachable() {
+      answer = "unreachable";
+    },
+    goSilent() {
+      answer = "silent";
+    },
+  };
+}
+
 function start(overrides: Partial<SyncServerOptions> = {}) {
   const lines: string[] = [];
   const server = createSyncServer({
@@ -40,6 +82,8 @@ function start(overrides: Partial<SyncServerOptions> = {}) {
     allowedOrigin: ORIGIN,
     dataDir,
     certExpiresAt: () => CERT_EXPIRES_AT,
+    bridgeUrl: "http://bridge.test:9186",
+    bridgeFetch: fakeBridge().bridgeFetch,
     log: (line) => lines.push(line),
     ...overrides,
   });
@@ -708,6 +752,8 @@ describe("pairing code", () => {
         reason: "push",
       },
     ],
+    ["POST", "/pager-calls", { pager: 21 }],
+    ["GET", "/transmitter", undefined],
   ])(
     "refuses %s %s without a code or with a wrong one",
     async (method, path, body) => {
@@ -774,6 +820,10 @@ describe("pairing code", () => {
     await server.handle(
       request("GET", "/log/stream?code=WRONGCDE", { code: null }),
     );
+    await server.handle(
+      request("POST", "/pager-calls", { body: { pager: 21 } }),
+    );
+    await server.handle(request("GET", "/transmitter"));
 
     const output = lines.join("\n");
     expect(lines.length).toBeGreaterThan(0);
@@ -783,6 +833,9 @@ describe("pairing code", () => {
     expect(output).not.toContain("after=");
     expect(lines).toContain("GET /log/stream 200");
     expect(lines).toContain("GET /log 401");
+    // #26: a pager call logs no more than any other request.
+    expect(lines).toContain("POST /pager-calls 200");
+    expect(lines).toContain("GET /transmitter 200");
   });
 });
 
@@ -843,6 +896,128 @@ describe("CORS", () => {
 
     expect(response.status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
+
+describe("POST /pager-calls", () => {
+  it("relays the pager call to the bridge and passes its answer on", async () => {
+    // #26
+    const bridge = fakeBridge();
+    const { server } = start({ bridgeFetch: bridge.bridgeFetch });
+
+    for (const result of ["ok", "failed", "notConnected"]) {
+      bridge.answer(() => Response.json({ result }));
+      const response = await server.handle(
+        request("POST", "/pager-calls", { body: { pager: 21 } }),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ result });
+    }
+    expect(bridge.requests.at(-1)).toEqual({
+      method: "POST",
+      url: "http://bridge.test:9186/calls",
+      body: { pager: 21 },
+    });
+  });
+
+  it("answers notConnected when the bridge is unreachable or answers nonsense", async () => {
+    // #26
+    const bridge = fakeBridge();
+    const { server } = start({ bridgeFetch: bridge.bridgeFetch });
+    const answers = [
+      () => new Response("down", { status: 503 }),
+      () => new Response("not json"),
+      () => Response.json({ result: "maybe" }),
+    ];
+
+    for (const answer of answers) {
+      bridge.answer(answer);
+      const response = await server.handle(
+        request("POST", "/pager-calls", { body: { pager: 3 } }),
+      );
+      expect(await response.json()).toEqual({ result: "notConnected" });
+    }
+    bridge.goUnreachable();
+    const response = await server.handle(
+      request("POST", "/pager-calls", { body: { pager: 3 } }),
+    );
+    expect(await response.json()).toEqual({ result: "notConnected" });
+  });
+
+  it("answers notConnected when the bridge doesn't answer within 3 s", async () => {
+    // #26
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const bridge = fakeBridge();
+    bridge.goSilent();
+    const { server } = start({ bridgeFetch: bridge.bridgeFetch });
+
+    const reply = server.handle(
+      request("POST", "/pager-calls", { body: { pager: 3 } }),
+    );
+    await vi.advanceTimersByTimeAsync(2_999);
+    let settled = false;
+    void reply.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(await (await reply).json()).toEqual({ result: "notConnected" });
+  });
+
+  it.each([{}, { pager: "21" }, { pager: 2.5 }, []])(
+    "refuses a body without a whole-number pager: %j",
+    async (body) => {
+      const bridge = fakeBridge();
+      const { server } = start({ bridgeFetch: bridge.bridgeFetch });
+
+      const response = await server.handle(
+        request("POST", "/pager-calls", { body }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(bridge.requests).toEqual([]);
+    },
+  );
+});
+
+describe("GET /transmitter", () => {
+  it("passes the bridge's status on", async () => {
+    // #26
+    const bridge = fakeBridge();
+    const { server } = start({ bridgeFetch: bridge.bridgeFetch });
+
+    for (const connected of [true, false]) {
+      bridge.answer(() => Response.json({ connected }));
+      const response = await server.handle(request("GET", "/transmitter"));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ connected });
+    }
+    expect(bridge.requests.at(-1)).toMatchObject({
+      method: "GET",
+      url: "http://bridge.test:9186/status",
+    });
+  });
+
+  it("reports not connected when the bridge is unreachable, slow or answers nonsense", async () => {
+    // #26
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const bridge = fakeBridge();
+    const { server } = start({ bridgeFetch: bridge.bridgeFetch });
+
+    bridge.answer(() => Response.json({ connected: "yes" }));
+    expect(
+      await (await server.handle(request("GET", "/transmitter"))).json(),
+    ).toEqual({ connected: false });
+    bridge.goUnreachable();
+    expect(
+      await (await server.handle(request("GET", "/transmitter"))).json(),
+    ).toEqual({ connected: false });
+    bridge.goSilent();
+    const reply = server.handle(request("GET", "/transmitter"));
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(await (await reply).json()).toEqual({ connected: false });
   });
 });
 

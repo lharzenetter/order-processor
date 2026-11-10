@@ -5,6 +5,7 @@ export interface ServerConfig {
   readonly keyFile: string;
   readonly dataDir: string;
   readonly port: number;
+  readonly bridgeUrl: string;
   readonly cert: Buffer;
   readonly key: Buffer;
 }
@@ -16,6 +17,8 @@ export type ConfigResult =
 const MIN_PAIRING_CODE_LENGTH = 8;
 const DEFAULT_PORT = 8443;
 const MAX_PORT = 65_535;
+// #23: the bridge runs on the Windows host, outside Docker Desktop.
+const DEFAULT_BRIDGE_URL = "http://host.docker.internal:9186";
 
 function required(
   env: Readonly<Record<string, string | undefined>>,
@@ -48,6 +51,15 @@ function readable(
 function isOrigin(value: string): boolean {
   try {
     return new URL(value).origin === value;
+  } catch {
+    return false;
+  }
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
   } catch {
     return false;
   }
@@ -96,6 +108,16 @@ export function readConfig(
     problems.push(`PORT must be a whole number from 1 to ${String(MAX_PORT)}.`);
   }
 
+  const bridgeUrl =
+    env.BRIDGE_URL === undefined || env.BRIDGE_URL === ""
+      ? DEFAULT_BRIDGE_URL
+      : env.BRIDGE_URL;
+  if (!isHttpUrl(bridgeUrl)) {
+    problems.push(
+      "BRIDGE_URL must be an http URL like http://host.docker.internal:9186.",
+    );
+  }
+
   if (
     problems.length > 0 ||
     pairingCode === undefined ||
@@ -118,6 +140,7 @@ export function readConfig(
       keyFile,
       dataDir,
       port,
+      bridgeUrl,
       cert,
       key,
     },

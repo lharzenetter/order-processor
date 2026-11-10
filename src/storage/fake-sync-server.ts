@@ -1,5 +1,5 @@
 import { isRecord } from "./guards";
-import type { SyncStream, StreamMessage } from "./server-log";
+import type { Fetch, SyncStream, StreamMessage } from "./server-log";
 
 /**
  * A stateful in-memory double of the sync server for tests: it re-implements the protocol rules
@@ -36,6 +36,9 @@ export interface FakeSyncServer {
 }
 
 export const FAKE_PING_EVERY_MS = 10_000;
+// #23, as on the real server.
+const BRIDGE_TIMEOUT_MS = 3_000;
+const PAGER_CALL_RESULTS: readonly unknown[] = ["ok", "failed", "notConnected"];
 
 interface Replacement {
   readonly previousLogId: string | null;
@@ -49,7 +52,12 @@ interface FakeStream extends SyncStream {
 }
 
 export function createFakeSyncServer(
-  options: { readonly pairingCode?: string; readonly logId?: string } = {},
+  options: {
+    readonly pairingCode?: string;
+    readonly logId?: string;
+    /** The pager bridge pager calls are relayed to; without one, it is unreachable. */
+    readonly bridgeFetch?: Fetch;
+  } = {},
 ): FakeSyncServer {
   const pairingCode = options.pairingCode ?? "ABCD2345";
   let events: Readonly<Record<string, unknown>>[] = [];
@@ -111,8 +119,60 @@ export function createFakeSyncServer(
     return lastSeq();
   }
 
-  function handle(method: string, url: URL, body: unknown): Response {
+  async function askBridge(
+    path: string,
+    init: RequestInit = {},
+  ): Promise<Readonly<Record<string, unknown>> | undefined> {
+    if (options.bridgeFetch === undefined) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, BRIDGE_TIMEOUT_MS);
+    try {
+      const response = await options.bridgeFetch(
+        `http://bridge.invalid${path}`,
+        { ...init, signal: controller.signal },
+      );
+      const body: unknown = response.ok ? await response.json() : undefined;
+      return isRecord(body) ? body : undefined;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function pagerCall(body: unknown): Promise<Response> {
+    if (!isRecord(body) || !Number.isInteger(body.pager)) {
+      return json(400, { error: "shape" });
+    }
+    const answer = await askBridge("/calls", {
+      method: "POST",
+      body: JSON.stringify({ pager: body.pager }),
+    });
+    const result = PAGER_CALL_RESULTS.includes(answer?.result)
+      ? answer?.result
+      : "notConnected";
+    return json(200, { result });
+  }
+
+  async function transmitter(): Promise<Response> {
+    const answer = await askBridge("/status");
+    return json(200, { connected: answer?.connected === true });
+  }
+
+  function handle(
+    method: string,
+    url: URL,
+    body: unknown,
+  ): Response | Promise<Response> {
     switch (`${method} ${url.pathname}`) {
+      case "POST /pager-calls":
+        return pagerCall(body);
+      case "GET /transmitter":
+        return transmitter();
       case "GET /log":
         return json(200, {
           logId,
@@ -250,7 +310,7 @@ export function createFakeSyncServer(
       typeof init.body === "string" ? JSON.parse(init.body) : undefined;
     const response =
       headers.get("X-Pairing-Code") === pairingCode
-        ? handle(method, url, body)
+        ? await handle(method, url, body)
         : json(401, { error: "pairing code" });
     const delay = delays.get(route);
     delays.delete(route);

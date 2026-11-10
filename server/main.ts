@@ -44,6 +44,7 @@ const sync = createSyncServer({
   pairingCode: config.pairingCode,
   allowedOrigin: config.allowedOrigin,
   dataDir: config.dataDir,
+  bridgeUrl: config.bridgeUrl,
   certExpiresAt: () => certExpiresAt,
 });
 
