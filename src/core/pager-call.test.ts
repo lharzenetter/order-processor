@@ -132,3 +132,45 @@ describe("which pager a tap calls", () => {
     expect(calledBy(log.events)).toBeNull();
   });
 });
+
+// #28
+describe("automatic pager calls", () => {
+  it("are on in a new event log", () => {
+    expect(fold([]).pagerCallsOn).toBe(true);
+  });
+
+  it("follow the newest switch", () => {
+    const log = testLog();
+    log.add({ type: "pagerCallsSwitched", on: false });
+    expect(fold(log.events).pagerCallsOn).toBe(false);
+    log.add({ type: "pagerCallsSwitched", on: true });
+    expect(fold(log.events).pagerCallsOn).toBe(true);
+  });
+
+  it("while off, a buzz, a re-buzz and a hand on call no pager", () => {
+    const { log, first, second } = twoOrdersWaitingForBraten();
+    log.add({ type: "pagerCallsSwitched", on: false });
+    log.add({
+      type: "platesBuzzed",
+      orderId: first.id,
+      productId: "braten",
+      count: 1,
+    });
+    expect(calledBy(log.events)).toBeNull();
+    log.add({ type: "rebuzzed", orderId: first.id, productId: "braten" });
+    expect(calledBy(log.events)).toBeNull();
+    log.add({
+      type: "plateHandedOn",
+      fromOrderId: first.id,
+      toOrderId: second.id,
+      productId: "braten",
+    });
+    expect(calledBy(log.events)).toBeNull();
+  });
+
+  it("a switch itself calls no pager", () => {
+    const log = testLog();
+    log.add({ type: "pagerCallsSwitched", on: true });
+    expect(calledBy(log.events)).toBeNull();
+  });
+});

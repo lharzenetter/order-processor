@@ -63,3 +63,21 @@
 .result {
   font-weight: 700;
 }
+
+.toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  margin-top: 16px;
+  font-size: 20px;
+}
+
+.toggle input {
+  width: 32px;
+  height: 32px;
+}
+
+.toggle small {
+  grid-column: 2;
+}

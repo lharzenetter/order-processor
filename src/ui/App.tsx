@@ -250,7 +250,10 @@ export function App() {
           board.rejectedReason,
           board.meta?.deviceName ?? "",
         )}
-        transmitterDisconnected={board.transmitterConnected === false}
+        transmitterDisconnected={
+          // #23: with automatic pager calls off, staff call by hand anyway.
+          state.pagerCallsOn && board.transmitterConnected === false
+        }
         actionsEnabled={board.actionsEnabled}
         onSoldOut={() => {
           setDialog({ kind: "soldOut" });
@@ -464,6 +467,9 @@ export function App() {
           }}
           showToast={showToast}
           onTestCall={callPager}
+          onSwitchPagerCalls={(on) => {
+            void run({ type: "pagerCallsSwitched", on });
+          }}
         />
       )}
       <Toasts toasts={toasts} onDismiss={dismissToast} />

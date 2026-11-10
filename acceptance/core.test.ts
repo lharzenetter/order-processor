@@ -7,6 +7,7 @@ import "./scenarios/cancel-and-sold-out";
 import "./scenarios/abandoned-order";
 import "./scenarios/undo";
 import "./scenarios/reporting";
+import "./scenarios/pager-calls";
 
 for (const { name, run } of scenarios()) {
   it(name, () => run(coreWindow()));

@@ -420,6 +420,86 @@ test("buzz, re-buzz and hand on call the pager of the order the plate is now wit
   });
 });
 
+test("Pager automatisch rufen switches pager calls off for every iPad", async ({
+  browser,
+  request,
+}) => {
+  // #28
+  async function bridgeCalls(): Promise<number[]> {
+    const fake = (await (await request.get(`${BRIDGE}/fake`)).json()) as {
+      calls: number[];
+    };
+    return fake.calls;
+  }
+  function automaticCalls(page: Page) {
+    return page
+      .getByRole("region", { name: "Sender" })
+      .getByRole("switch", { name: /Pager automatisch rufen/ });
+  }
+  const annahme = await ipad(browser);
+  await connect(annahme, "Annahme");
+  await connectedAs(annahme, "Annahme");
+  const ausgabe = await ipad(browser);
+  await connect(ausgabe, "Ausgabe");
+  await connectedAs(ausgabe, "Ausgabe");
+  await expect(automaticCalls(ausgabe)).toBeChecked();
+  await closeVerwaltung(ausgabe);
+  await takeOrder(ausgabe, { Braten: 2 }, 12);
+
+  await automaticCalls(annahme).click();
+  await expect(automaticCalls(annahme)).not.toBeChecked();
+  await expect(
+    header(ausgabe).getByRole("button", { name: /Rückgängig/ }),
+  ).toContainText("Neue Bestellung 2× Braten → Pager 12 (Ausgabe)");
+
+  // While off, a buzz calls nobody and shows no result; a transmitter lost meanwhile shows no
+  // Sender getrennt.
+  await request.put(`${BRIDGE}/fake`, {
+    data: { connected: false, result: "notConnected" },
+  });
+  const sender = annahme.getByRole("region", { name: "Sender" });
+  await expect(sender).toContainText("Sender nicht verbunden", {
+    timeout: 10_000,
+  });
+  await boardRow(ausgabe, "Braten")
+    .getByRole("button", { name: "Pager 12 rufen" })
+    .click();
+  await expect(gerufenLine(ausgabe, 12, "Braten")).toBeVisible();
+  await gerufenLine(ausgabe, 12, "Braten")
+    .getByRole("button", { name: "Nochmal rufen" })
+    .click();
+  await ausgabe.waitForTimeout(6_000);
+  expect(await bridgeCalls()).toEqual([]);
+  await expect(ausgabe.getByRole("status")).not.toContainText("Pager 12");
+  await expect(header(ausgabe)).not.toContainText("Sender getrennt");
+
+  // Testruf still calls with automatic pager calls off.
+  await sender.getByLabel("Testruf an Pager").fill("7");
+  await sender.getByRole("button", { name: "Rufen" }).click();
+  await expect(annahme.getByRole("status")).toContainText(
+    "Sender nicht verbunden – Pager 7 von Hand rufen",
+  );
+  expect(await bridgeCalls()).toEqual([7]);
+
+  // Rückgängig takes back the buzz, never the switch.
+  await header(ausgabe)
+    .getByRole("button", { name: /Rückgängig/ })
+    .click();
+  await expect(
+    header(ausgabe).getByRole("button", { name: /Rückgängig/ }),
+  ).toContainText("Braten gerufen → Pager 12 (Ausgabe)");
+  await expect(automaticCalls(annahme)).not.toBeChecked();
+
+  await request.put(`${BRIDGE}/fake`, { data: {} });
+  await automaticCalls(annahme).click();
+  await expect(automaticCalls(annahme)).toBeChecked();
+  await gerufenLine(ausgabe, 12, "Braten")
+    .getByRole("button", { name: "Nochmal rufen" })
+    .click();
+  await expect(ausgabe.getByRole("status")).toContainText("Pager 12 gerufen");
+  await expect.poll(bridgeCalls).toEqual([12]);
+});
+
 test("standalone never reaches beyond this machine", async ({ page }) => {
   const hosts = new Set<string>();
   page.on("request", (request) => {

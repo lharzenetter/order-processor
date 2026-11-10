@@ -20,13 +20,23 @@ function statusText(connected: boolean | null): string {
   return connected ? "● Sender verbunden" : "○ Sender nicht verbunden";
 }
 
-/** The Verwaltung's transmitter check in sync mode: its status, and a Testruf that records nothing. */
+/**
+ * The Verwaltung's transmitter check in sync mode: its status, a Testruf that records nothing, and
+ * the Pager automatisch rufen switch for every iPad. Status and Testruf work with the switch off.
+ */
 export function TransmitterSection({
   connected,
   onTestCall,
+  pagerCallsOn,
+  switchEnabled,
+  onSwitchPagerCalls,
 }: {
   connected: boolean | null;
   onTestCall: (pager: number) => Promise<void>;
+  pagerCallsOn: boolean;
+  /** The switch is recorded, so like every tap it needs the server to count it. */
+  switchEnabled: boolean;
+  onSwitchPagerCalls: (on: boolean) => void;
 }) {
   const [digits, setDigits] = useState("");
   const [calling, setCalling] = useState(false);
@@ -66,6 +76,23 @@ export function TransmitterSection({
           {calling ? "Rufe…" : "Rufen"}
         </button>
       </div>
+      <label className={styles.toggle}>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={pagerCallsOn}
+          disabled={!switchEnabled}
+          onChange={(event) => {
+            onSwitchPagerCalls(event.target.checked);
+          }}
+        />
+        Pager automatisch rufen
+        <small className={shared.muted}>
+          {pagerCallsOn
+            ? "Rufen, Nochmal rufen und Weitergeben rufen den Pager, auf allen iPads."
+            : "Aus auf allen iPads: Pager von Hand am Sender rufen."}
+        </small>
+      </label>
     </section>
   );
 }

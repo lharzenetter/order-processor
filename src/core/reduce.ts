@@ -22,7 +22,15 @@ export function reduce(state: State, event: Event): State {
     if (target?.id !== event.targetId) {
       throw new Error(`Undo target ${event.targetId} is not the newest event`);
     }
-    return state.live.slice(0, -1).reduce(reduce, INITIAL_STATE);
+    return {
+      ...state.live.slice(0, -1).reduce(reduce, INITIAL_STATE),
+      pagerCallsOn: state.pagerCallsOn,
+    };
+  }
+  if (event.type === "pagerCallsSwitched") {
+    // Kept out of `live`, so undo skips it and never turns calls back on while the transmitter
+    // is disconnected (#23).
+    return { ...state, pagerCallsOn: event.on };
   }
   const next = apply(state, event);
   return { ...next, live: [...state.live, event] };
@@ -30,7 +38,7 @@ export function reduce(state: State, event: Event): State {
 
 function apply(
   state: State,
-  event: Exclude<Event, { type: "actionUndone" }>,
+  event: Exclude<Event, { type: "actionUndone" | "pagerCallsSwitched" }>,
 ): State {
   switch (event.type) {
     case "orderTaken":

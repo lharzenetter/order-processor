@@ -38,6 +38,23 @@ describe("Rückgängig", () => {
     expect(() => fold(log.events)).toThrow();
   });
 
+  // #28: undo never turns calls back on while the transmitter is disconnected
+  it("skips a switch of automatic pager calls and takes back the action before it", () => {
+    const log = testLog({ device: "Links" });
+    log.add({ type: "pagerMarkedMissing", pager: 3 });
+    const off = log.add({ type: "pagerCallsSwitched", on: false });
+    expect(undoTarget(fold(log.events))?.label).toBe(
+      "Pager 3 als fehlend markiert (Links)",
+    );
+    log.add({ type: "actionUndone", targetId: "e1" });
+    const state = fold(log.events);
+    expect(state.missingPagers).toEqual([]);
+    expect(state.pagerCallsOn).toBe(false);
+    expect(undoTarget(state)).toBeNull();
+    log.add({ type: "actionUndone", targetId: off.id });
+    expect(() => fold(log.events)).toThrow();
+  });
+
   it("refuses to undo an undo", () => {
     const log = testLog();
     const missing = log.add({ type: "pagerMarkedMissing", pager: 3 });
@@ -186,6 +203,17 @@ describe("describeEvent", () => {
             { type: "soldOutCleared", productId: "pommes" },
           ],
           "Pommes wieder verfügbar",
+        ],
+        [
+          [{ type: "pagerCallsSwitched", on: false }],
+          "Pager automatisch rufen aus",
+        ],
+        [
+          [
+            { type: "pagerCallsSwitched", on: false },
+            { type: "pagerCallsSwitched", on: true },
+          ],
+          "Pager automatisch rufen an",
         ],
       ] satisfies [EventBody[], string][]
     ).map(([bodies, label]) => ({ bodies, label })),

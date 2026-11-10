@@ -84,9 +84,13 @@ export function handOnTarget(
 
 /**
  * The pager a tap calls, read from the state after it: a buzz and a re-buzz call the order's
- * pager, a hand on the receiving order's; every other event calls none (#23).
+ * pager, a hand on the receiving order's; every other event calls none, and none calls while
+ * automatic pager calls are off (#23).
  */
 export function pagerToCall(state: State, tap: EventBody): number | null {
+  if (!state.pagerCallsOn) {
+    return null;
+  }
   switch (tap.type) {
     case "platesBuzzed":
     case "rebuzzed":
@@ -103,6 +107,7 @@ export function pagerToCall(state: State, tap: EventBody): number | null {
     case "soldOutMarked":
     case "soldOutCleared":
     case "actionUndone":
+    case "pagerCallsSwitched":
       return null;
     default:
       return assertNever(tap);
