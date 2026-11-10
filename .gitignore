@@ -325,3 +325,4 @@ deploy/certs/
 deploy/data/
 
 *.rar
+*.pdf
