@@ -1,6 +1,6 @@
-# Mirrors /opt/kirbe/ on the Pi and is copied there as-is. No venue values live here: they come from
-# .env next to this file (see env.example). The data/ and certs/ directories must belong to uid 1000,
-# the user both the server and lego run as.
+# Mirrors C:\kirbe\ on the venue machine, a Windows PC running Docker Desktop, and is copied there
+# as-is. No venue values live here: they come from .env next to this file (see env.example).
+# The pager bridge is not in here: it runs on Windows itself, as a service (install-bridge.ps1).
 name: kirbe
 
 services:
@@ -14,9 +14,13 @@ services:
       CERT_FILE: /certs/certificates/kirbe.${DOMAIN:?set DOMAIN in .env}.crt
       KEY_FILE: /certs/certificates/kirbe.${DOMAIN}.key
       DATA_DIR: /data
+      # Empty means the server's default, http://host.docker.internal:9186: the bridge on this PC.
+      BRIDGE_URL: ${BRIDGE_URL:-}
     volumes:
       - ./certs:/certs:ro
-      - ./data:/data
+      # A named volume inside Docker Desktop's VM, not a folder on C:. SQLite runs the log in WAL
+      # mode, which needs a Linux file system, not a Windows folder shared into the container.
+      - data:/data
     ports:
       - "443:8443"
     healthcheck:
@@ -47,12 +51,6 @@ services:
     volumes:
       - ./certs:/certs
 
-  # Answers kirbe.<domain> with the Pi's IP; the FRITZ!Box hands the Pi out as its local DNS server.
-  dnsmasq:
-    image: 4km3/dnsmasq:2.90-r3
-    restart: unless-stopped
-    ports:
-      - "${PI_IP:?set PI_IP in .env}:53:53/udp"
-      - "${PI_IP}:53:53/tcp"
-    volumes:
-      - ./dnsmasq.conf:/etc/dnsmasq.conf:ro
+volumes:
+  # Takes the image's /data, owned by the server's user, when it is first created.
+  data:

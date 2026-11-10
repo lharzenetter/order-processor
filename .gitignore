@@ -318,11 +318,10 @@ $RECYCLE.BIN/
 # PWA dev output
 dev-dist/
 
-# Server deployment: venue values, secrets, certificates and the log stay on the Pi
+# Server deployment: venue values, secrets and certificates stay on the venue machine
 deploy/.env
 deploy/secrets/*.env
 deploy/certs/
-deploy/data/
 
 *.rar
 *.pdf
