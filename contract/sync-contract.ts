@@ -1,6 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readImportFile } from "../src/storage/index";
-import type { Fetch, OpenStream, StreamMessage } from "../src/storage/index";
+import type {
+  FakeBridge,
+  Fetch,
+  OpenStream,
+  StreamMessage,
+} from "../src/storage/index";
 
 export const CONTRACT_CODE = "ABCD2345";
 const BASE = "https://kirbe.example.de";
@@ -11,6 +16,8 @@ export interface SyncTarget {
   readonly openStream: OpenStream;
   /** Only the real server writes archive files. */
   readonly archives?: () => readonly unknown[];
+  /** The pager bridge the target relays pager calls to. */
+  readonly bridge: FakeBridge;
   close(): void;
 }
 
@@ -170,6 +177,72 @@ export function describeSyncContract(
         reason: "import",
       });
       expect(await head()).toMatchObject({ formatVersion: 1, lastSeq: 1 });
+    });
+
+    async function pagerCall(pager: unknown, code?: string) {
+      return call("/pager-calls", {
+        method: "POST",
+        body: { pager },
+        ...(code === undefined ? {} : { code }),
+      });
+    }
+
+    describe("pager calls", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("relays a pager call and passes each bridge answer on", async () => {
+        // #26
+        for (const result of ["ok", "failed", "notConnected"] as const) {
+          target.bridge.answerCalls(result);
+          expect(await pagerCall(21)).toEqual({
+            status: 200,
+            body: { result },
+          });
+        }
+        expect(target.bridge.calls).toEqual([21, 21, 21]);
+      });
+
+      it("refuses a pager call without the pairing code, or without a whole-number pager", async () => {
+        // #26
+        expect((await pagerCall(21, "WRONG234")).status).toBe(401);
+        expect((await pagerCall("21")).status).toBe(400);
+        expect(target.bridge.calls).toEqual([]);
+      });
+
+      it("passes the transmitter status on, behind the pairing code", async () => {
+        // #26
+        expect(await call("/transmitter")).toEqual({
+          status: 200,
+          body: { connected: true },
+        });
+        target.bridge.connectTransmitter(false);
+        expect((await call("/transmitter")).body).toEqual({
+          connected: false,
+        });
+        expect((await call("/transmitter", { code: "WRONG234" })).status).toBe(
+          401,
+        );
+      });
+
+      it("counts an unreachable bridge as not connected", async () => {
+        // #26
+        target.bridge.goUnreachable();
+        expect((await pagerCall(21)).body).toEqual({ result: "notConnected" });
+        expect((await call("/transmitter")).body).toEqual({ connected: false });
+      });
+
+      it("counts a bridge silent for 3 s as not connected", async () => {
+        // #26
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        target.bridge.goSilent();
+        const called = pagerCall(21);
+        const status = call("/transmitter");
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect((await called).body).toEqual({ result: "notConnected" });
+        expect((await status).body).toEqual({ connected: false });
+      });
     });
 
     it.runIf(name === "the real server")(

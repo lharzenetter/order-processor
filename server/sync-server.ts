@@ -17,9 +17,18 @@ export interface SyncServerOptions {
   readonly dataDir: string;
   /** The certificate's notAfter in ms, read on each GET /log; null when unknown. */
   readonly certExpiresAt: () => number | null;
+  /** The pager bridge's base URL, as `BRIDGE_URL` gives it. */
+  readonly bridgeUrl: string;
+  /** How the bridge is reached (default the global fetch); tests pass a double. */
+  readonly bridgeFetch?: BridgeFetch;
   /** Where log lines go (default console.log); tests capture it. Never gets the code or a query string. */
   readonly log?: (line: string) => void;
 }
+
+export type BridgeFetch = (
+  input: string,
+  init?: RequestInit,
+) => Promise<Response>;
 
 export interface SyncServer {
   handle(request: Request): Promise<Response>;
@@ -29,6 +38,9 @@ export interface SyncServer {
 
 const PING_INTERVAL_MS = 10_000;
 const PREFLIGHT_MAX_AGE_MS = 86_400_000;
+// #23: a bridge that doesn't answer within this counts as not connected.
+const BRIDGE_TIMEOUT_MS = 3_000;
+const PAGER_CALL_RESULTS: readonly unknown[] = ["ok", "failed", "notConnected"];
 
 // A browser EventSource never surfaces SSE comments, so the iPad's 25 s watchdog could not see a
 // bare `: ping`. The comment stays for proxies and curl; the named `ping` event is what the iPad
@@ -122,12 +134,40 @@ function appendedMessage(event: StoredEvent): string {
   return `event: appended\nid: ${String(event.seq)}\ndata: ${event.json}\n\n`;
 }
 
+/** The bridge's answer as JSON, or undefined when it is unreachable, slow or answers garbage. */
+async function askBridge(
+  bridgeFetch: BridgeFetch,
+  url: string,
+  init: RequestInit = {},
+): Promise<Body | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, BRIDGE_TIMEOUT_MS);
+  try {
+    const response = await bridgeFetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    if (!response.ok) return undefined;
+    const body: unknown = await response.json();
+    return isRecord(body) ? body : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function digest(code: string): Buffer {
   return createHash("sha256").update(code).digest();
 }
 
 export function createSyncServer(options: SyncServerOptions): SyncServer {
   const log = options.log ?? console.log;
+  const bridgeFetch: BridgeFetch =
+    options.bridgeFetch ?? ((input, init) => fetch(input, init));
+  const bridgeUrl = options.bridgeUrl.replace(/\/+$/, "");
   mkdirSync(options.dataDir, { recursive: true });
   const store: LogStore = openLogStore(join(options.dataDir, "kirbe.sqlite"));
   const archiveDir = join(options.dataDir, "archive");
@@ -217,6 +257,32 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
     return json(200, { logId });
   }
 
+  // #23: the pager is relayed as received; the server never looks at orders or events.
+  async function postPagerCall(request: Request): Promise<Response> {
+    const body = await readJson(request);
+    if (
+      body === undefined ||
+      !isRecord(body.value) ||
+      !isWholeNumber(body.value.pager)
+    ) {
+      return status(400);
+    }
+    const answer = await askBridge(bridgeFetch, `${bridgeUrl}/calls`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pager: body.value.pager }),
+    });
+    const result = PAGER_CALL_RESULTS.includes(answer?.result)
+      ? answer?.result
+      : "notConnected";
+    return json(200, { result });
+  }
+
+  async function getTransmitter(): Promise<Response> {
+    const answer = await askBridge(bridgeFetch, `${bridgeUrl}/status`);
+    return json(200, { connected: answer?.connected === true });
+  }
+
   function openStream(request: Request): Response {
     let stop = (): void => undefined;
     const body = new ReadableStream<Uint8Array>({
@@ -291,6 +357,8 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
       "GET /log/events": () => getEvents(url),
       "POST /log/events": () => postEvent(request),
       "PUT /log": () => putLog(request),
+      "POST /pager-calls": () => postPagerCall(request),
+      "GET /transmitter": getTransmitter,
     };
     const handler = handlers[endpoint];
     if (handler === undefined) return status(404);
