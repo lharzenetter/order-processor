@@ -32,7 +32,7 @@ public sealed class TransmitterSessionTests : IDisposable
     [Fact(Timeout = 10_000)]
     public async Task Learns_the_system_id_when_reads_come_back_empty_before_the_heartbeat()
     {
-        // The Windows serial driver may end a read with no bytes or a timeout while the line is quiet.
+        // #31: the Windows serial driver may end a read with no bytes or a timeout while the line is quiet.
         port.ReadsNothing();
         port.TimesOut();
         port.Send(Heartbeat);
@@ -46,6 +46,7 @@ public sealed class TransmitterSessionTests : IDisposable
     [Fact(Timeout = 10_000)]
     public async Task Reads_that_come_back_empty_keep_the_transmitter_connected()
     {
+        // #31
         await using var session = await Open();
 
         port.ReadsNothing();
