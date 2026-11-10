@@ -3,6 +3,7 @@ import {
   assertNever,
   fold,
   INITIAL_STATE,
+  pagerToCall,
   reduce,
   undoTarget,
 } from "../core/index";
@@ -96,7 +97,11 @@ export interface PagerBoard {
 const REPLACED: ReplaceResult = { kind: "replaced" };
 
 /** The one hook that owns the board's state: folded from the log, changed only through it. */
-export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
+export function usePagerBoard(
+  showToast: (text: string) => void,
+  /** The result of the pager call a tap sent, arriving after the tap finished (#23). */
+  onPagerCalled: (pager: number, result: PagerCallResult) => void,
+): PagerBoard {
   const [status, setStatus] = useState<BoardStatus>({ kind: "loading" });
   const [state, setState] = useState<State>(INITIAL_STATE);
   const [now, setNow] = useState(() => Date.now());
@@ -119,6 +124,10 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
   const connectionRef = useRef<Connection>("standalone");
   // Appends run one after another, so each event is checked against the state the previous made.
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const onPagerCalledRef = useRef(onPagerCalled);
+  useEffect(() => {
+    onPagerCalledRef.current = onPagerCalled;
+  }, [onPagerCalled]);
 
   const loadFrom = useCallback(async (opened: DeviceStore) => {
     const events = await opened.load();
@@ -332,9 +341,18 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
             ...(device === undefined ? {} : { device }),
           });
           switch (result.kind) {
-            case "appended":
+            case "appended": {
               apply(result.events, store);
+              // #23: only a tap the server appended calls, so a lost race never calls a guest.
+              const pager =
+                serverLog === null ? null : pagerToCall(stateRef.current, body);
+              if (serverLog !== null && pager !== null) {
+                void serverLog.callPager(pager).then((called) => {
+                  onPagerCalledRef.current(pager, called);
+                });
+              }
               return stateRef.current;
+            }
             case "changed":
               apply(result.events, store);
               showToast("Inzwischen geändert");

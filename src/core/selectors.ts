@@ -1,6 +1,7 @@
+import { assertNever } from "./assert-never";
 import { MENU } from "./menu";
 import { PAGER_COUNT, REBUZZ_AFTER_MS } from "./parameters";
-import type { Event } from "./event";
+import type { Event, EventBody } from "./event";
 import { kirbeShifts, shiftRange } from "./kirbe-shifts";
 import type { Shift } from "./kirbe-shifts";
 import {
@@ -79,6 +80,37 @@ export function handOnTarget(
   productId: string,
 ): Order | null {
   return nextOrderFor(state, productId, orderId);
+}
+
+/**
+ * The pager a tap calls, read from the state after it: a buzz and a re-buzz call the order's
+ * pager, a hand on the receiving order's; every other event calls none (#23).
+ */
+export function pagerToCall(state: State, tap: EventBody): number | null {
+  switch (tap.type) {
+    case "platesBuzzed":
+    case "rebuzzed":
+      return pagerOf(state, tap.orderId);
+    case "plateHandedOn":
+      return pagerOf(state, tap.toOrderId);
+    case "orderTaken":
+    case "plateSentBackToQueue":
+    case "platesHandedOver":
+    case "platesCancelled":
+    case "orderAbandoned":
+    case "pagerMarkedMissing":
+    case "pagerRestored":
+    case "soldOutMarked":
+    case "soldOutCleared":
+    case "actionUndone":
+      return null;
+    default:
+      return assertNever(tap);
+  }
+}
+
+function pagerOf(state: State, orderId: string): number | null {
+  return state.orders.find((order) => order.id === orderId)?.pager ?? null;
 }
 
 export interface BuzzedLine {

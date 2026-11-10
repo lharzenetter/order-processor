@@ -7,6 +7,7 @@ import {
   pagerOverview,
 } from "../core/index";
 import type { EventBody, PlateCount, State } from "../core/index";
+import type { PagerCallResult } from "../storage/index";
 import styles from "./App.module.css";
 import { SoldOutBanners, StandaloneBanner, SyncStrip } from "./Banners";
 import { Board } from "./Board";
@@ -50,7 +51,7 @@ type Dialog =
 
 export function App() {
   const { toasts, showToast, dismissToast } = useToasts();
-  const board = usePagerBoard(showToast);
+  const board = usePagerBoard(showToast, showPagerCall);
   const device = useDevice();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [verwaltungOpen, setVerwaltungOpen] = useState(false);
@@ -89,9 +90,12 @@ export function App() {
   // #23: the result arrives on its own, after the tap; Erneut senden repeats only the call.
   async function callPager(pager: number): Promise<void> {
     const result = await board.callPager(pager);
-    if (result === null) {
-      return;
+    if (result !== null) {
+      showPagerCall(pager, result);
     }
+  }
+
+  function showPagerCall(pager: number, result: PagerCallResult): void {
     const toast = pagerCallToast(pager, result);
     showToast(toast.text, {
       stays: toast.stays,
@@ -246,6 +250,7 @@ export function App() {
           board.rejectedReason,
           board.meta?.deviceName ?? "",
         )}
+        transmitterDisconnected={board.transmitterConnected === false}
         actionsEnabled={board.actionsEnabled}
         onSoldOut={() => {
           setDialog({ kind: "soldOut" });

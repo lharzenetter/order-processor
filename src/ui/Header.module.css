@@ -28,6 +28,11 @@
   font-size: 16px;
 }
 
+.transmitter {
+  color: var(--white);
+  font-weight: 700;
+}
+
 .undo {
   display: flex;
   flex-direction: column;

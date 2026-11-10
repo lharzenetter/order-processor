@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
-import { longPress, openApp, takeOrder } from "./window";
+import { boardRow, gerufenLine, longPress, openApp, takeOrder } from "./window";
 
 // The flows share the one real sync server, so they run one after another.
 test.describe.configure({ mode: "serial", timeout: 120_000 });
@@ -331,6 +331,93 @@ test("Testruf calls a pager from the Verwaltung and records nothing", async ({
   await expect(page.getByRole("status")).not.toContainText(byHand);
 
   await expect(verwaltung).toContainText("Ereignisse im Protokoll: 0");
+});
+
+test("buzz, re-buzz and hand on call the pager of the order the plate is now with", async ({
+  browser,
+  request,
+}) => {
+  // #27
+  async function bridgeCalls(): Promise<number[]> {
+    const fake = (await (await request.get(`${BRIDGE}/fake`)).json()) as {
+      calls: number[];
+    };
+    return fake.calls;
+  }
+  const page = await ipad(browser);
+  await connect(page, "Annahme");
+  await connectedAs(page, "Annahme");
+  await closeVerwaltung(page);
+  await takeOrder(page, { Braten: 1 }, 12);
+  await takeOrder(page, { Braten: 1 }, 5);
+  await takeOrder(page, { Pommes: 3 }, 9);
+  expect(await bridgeCalls()).toEqual([]);
+
+  await boardRow(page, "Braten")
+    .getByRole("button", { name: "Pager 12 rufen" })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Pager 12 gerufen");
+  await boardRow(page, "Pommes")
+    .getByRole("button", { name: "Alle 3" })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Pager 9 gerufen");
+  await gerufenLine(page, 12, "Braten")
+    .getByRole("button", { name: "Nochmal rufen" })
+    .click();
+  await expect.poll(bridgeCalls).toEqual([12, 9, 12]);
+
+  await gerufenLine(page, 12, "Braten")
+    .getByRole("button", { name: "Ausgeben…" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Pager 12" })
+    .getByRole("button", { name: "Etwas stimmt nicht …" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Pager 12 — etwas stimmt nicht" })
+    .getByRole("button", { name: /Braten weitergeben/ })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Pager 5 gerufen");
+  await expect.poll(bridgeCalls).toEqual([12, 9, 12, 5]);
+  await page
+    .getByRole("dialog", { name: "Pager 12 — etwas stimmt nicht" })
+    .getByRole("button", { name: "Fenster schließen" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Pager 12" })
+    .getByRole("button", { name: "Schließen", exact: true })
+    .click();
+
+  await header(page)
+    .getByRole("button", { name: /Rückgängig/ })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Rückgängig:");
+  await expect(gerufenLine(page, 12, "Braten")).toBeVisible();
+  expect(await bridgeCalls()).toEqual([12, 9, 12, 5]);
+
+  // A failed call stays, naming the pager, until resent or tapped away.
+  await request.put(`${BRIDGE}/fake`, { data: { result: "failed" } });
+  await gerufenLine(page, 12, "Braten")
+    .getByRole("button", { name: "Nochmal rufen" })
+    .click();
+  const failed = page.getByRole("status");
+  await expect(failed).toContainText("Pager 12 nicht gerufen");
+  await request.put(`${BRIDGE}/fake`, { data: { result: "ok" } });
+  await failed.getByRole("button", { name: "Erneut senden" }).click();
+  await expect(failed).not.toContainText("nicht gerufen");
+  await expect.poll(bridgeCalls).toEqual([12]);
+  await expect(header(page)).not.toContainText("Sender getrennt");
+
+  await request.put(`${BRIDGE}/fake`, {
+    data: { connected: false, result: "notConnected" },
+  });
+  await expect(header(page)).toContainText("Sender getrennt", {
+    timeout: 10_000,
+  });
+  await request.put(`${BRIDGE}/fake`, { data: {} });
+  await expect(header(page)).not.toContainText("Sender getrennt", {
+    timeout: 10_000,
+  });
 });
 
 test("standalone never reaches beyond this machine", async ({ page }) => {

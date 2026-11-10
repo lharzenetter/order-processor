@@ -5,6 +5,7 @@ import styles from "./Header.module.css";
 export function Header({
   state,
   connectionStatus,
+  transmitterDisconnected,
   actionsEnabled,
   onSoldOut,
   onUndo,
@@ -13,6 +14,8 @@ export function Header({
   state: State;
   /** Eigenständig, Verbunden als …: appended to the counts line. */
   connectionStatus: string;
+  /** The server reports the transmitter not connected: staff call by hand (#23). */
+  transmitterDisconnected: boolean;
   actionsEnabled: boolean;
   onSoldOut: () => void;
   onUndo: () => void;
@@ -27,6 +30,12 @@ export function Header({
         <span className={styles.title}>Kirbe Essensausgabe</span>
         <span className={styles.counts}>
           {openOrders} offen · {freePagers} Pager frei · {connectionStatus}
+          {transmitterDisconnected && (
+            <>
+              {" · "}
+              <span className={styles.transmitter}>Sender getrennt</span>
+            </>
+          )}
         </span>
       </div>
       <button
