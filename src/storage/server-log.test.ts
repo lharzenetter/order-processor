@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../core/index";
+import { createFakeBridge } from "./fake-bridge";
 import { createFakeSyncServer } from "./fake-sync-server";
 import type { FakeSyncServer } from "./fake-sync-server";
 import { FORMAT_VERSION, ImportRejectedError, openDeviceStore } from "./index";
@@ -486,5 +487,42 @@ describe("replacing the log", () => {
       kind: "conflict",
     });
     expect(await ipad.store.load()).toHaveLength(1);
+  });
+});
+
+describe("pager calls", () => {
+  // #26
+  it("sends a pager call through the server and reports the bridge's answer, recording nothing", async () => {
+    const bridge = createFakeBridge();
+    const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
+    const ipad = await connectIpad(server);
+
+    for (const result of ["ok", "failed", "notConnected"] as const) {
+      bridge.answerCalls(result);
+      expect(await ipad.log.callPager(21)).toBe(result);
+    }
+    expect(bridge.calls).toEqual([21, 21, 21]);
+    expect(server.events).toEqual([]);
+    expect(await ipad.store.load()).toEqual([]);
+  });
+
+  it("counts an unreachable server as not connected", async () => {
+    const bridge = createFakeBridge();
+    const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
+    const ipad = await connectIpad(server);
+    server.goOffline();
+
+    expect(await ipad.log.callPager(21)).toBe("notConnected");
+    expect(await ipad.log.transmitterConnected()).toBe(false);
+  });
+
+  it("reports whether the transmitter is connected", async () => {
+    const bridge = createFakeBridge();
+    const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
+    const ipad = await connectIpad(server);
+
+    expect(await ipad.log.transmitterConnected()).toBe(true);
+    bridge.connectTransmitter(false);
+    expect(await ipad.log.transmitterConnected()).toBe(false);
   });
 });

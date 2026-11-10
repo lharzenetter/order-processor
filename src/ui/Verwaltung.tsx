@@ -25,6 +25,7 @@ import { LongPressButton } from "./LongPressButton";
 import { ModalDialog } from "./ModalDialog";
 import { ServerSection } from "./ServerSection";
 import shared from "./shared.module.css";
+import { TransmitterSection } from "./TransmitterSection";
 import { updateRow } from "./update-row";
 import type { Device } from "./use-device";
 import type { PagerBoard } from "./use-pager-board";
@@ -49,12 +50,15 @@ export function Verwaltung({
   device,
   onBack,
   showToast,
+  onTestCall,
 }: {
   mode: "full" | "recovery";
   board: PagerBoard;
   device: Device;
   onBack?: () => void;
   showToast: (text: string) => void;
+  /** Sends a pager call and shows its result toast; records nothing. */
+  onTestCall?: (pager: number) => Promise<void>;
 }) {
   const { state, meta, store, connection } = board;
   const onRefreshMeta = board.refreshMeta;
@@ -168,6 +172,12 @@ export function Verwaltung({
           onOverwrite={() => {
             setGuard({ kind: "overwrite" });
           }}
+        />
+      )}
+      {mode === "full" && synced && onTestCall !== undefined && (
+        <TransmitterSection
+          connected={board.transmitterConnected}
+          onTestCall={onTestCall}
         />
       )}
       <section className={styles.section}>

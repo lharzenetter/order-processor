@@ -18,6 +18,7 @@ import { Header } from "./Header";
 import { IntakeDialog } from "./IntakeDialog";
 import { KitchenDisplay } from "./KitchenDisplay";
 import { OrderDialog } from "./OrderDialog";
+import { pagerCallToast } from "./pager-call-toast";
 import type { LineActions } from "./OrderDialog";
 import shared from "./shared.module.css";
 import {
@@ -48,7 +49,7 @@ type Dialog =
     };
 
 export function App() {
-  const { toasts, showToast } = useToasts();
+  const { toasts, showToast, dismissToast } = useToasts();
   const board = usePagerBoard(showToast);
   const device = useDevice();
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -84,6 +85,28 @@ export function App() {
       delete button.dataset.pending;
     };
   }, [pending]);
+
+  // #23: the result arrives on its own, after the tap; Erneut senden repeats only the call.
+  async function callPager(pager: number): Promise<void> {
+    const result = await board.callPager(pager);
+    if (result === null) {
+      return;
+    }
+    const toast = pagerCallToast(pager, result);
+    showToast(toast.text, {
+      stays: toast.stays,
+      ...(toast.resend
+        ? {
+            action: {
+              label: "Erneut senden",
+              run: () => {
+                void callPager(pager);
+              },
+            },
+          }
+        : {}),
+    });
+  }
 
   // Every action goes through the log; a refused event is a bug, shown rather than swallowed.
   async function run(body: EventBody): Promise<State | null> {
@@ -186,7 +209,7 @@ export function App() {
           device={device}
           showToast={showToast}
         />
-        <Toasts toasts={toasts} />
+        <Toasts toasts={toasts} onDismiss={dismissToast} />
       </>
     );
   }
@@ -435,9 +458,10 @@ export function App() {
             setVerwaltungOpen(false);
           }}
           showToast={showToast}
+          onTestCall={callPager}
         />
       )}
-      <Toasts toasts={toasts} />
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

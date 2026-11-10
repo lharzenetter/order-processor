@@ -19,6 +19,7 @@ import type {
   EventLog,
   LogChange,
   Meta,
+  PagerCallResult,
   ReplaceResult,
   ServerLog,
   ServerTest,
@@ -31,6 +32,8 @@ import { submitTap } from "./submit-tap";
 // The time-dependent selectors (time since a buzz, re-buzz due) stay current this way; there are
 // no tick events (spec, "Selectors").
 const RENDER_EVERY_MS = 1_000;
+// #23: polled alongside the server connection; the bridge notices a lost transmitter in about 5 s.
+const TRANSMITTER_POLL_MS = 5_000;
 
 export type BoardStatus =
   | { readonly kind: "loading" }
@@ -84,6 +87,10 @@ export interface PagerBoard {
     productSelection: readonly string[],
   ) => Promise<void>;
   readonly endKitchenDisplay: () => Promise<void>;
+  /** Sends a pager call through the server, recording nothing; `null` when standalone. */
+  readonly callPager: (pager: number) => Promise<PagerCallResult | null>;
+  /** What the server last reported about the transmitter; `null` until connected and asked. */
+  readonly transmitterConnected: boolean | null;
 }
 
 const REPLACED: ReplaceResult = { kind: "replaced" };
@@ -103,6 +110,9 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
   const [pending, setPending] = useState(false);
   const [blockedSince, setBlockedSince] = useState<number | null>(null);
   const [certExpiresAt, setCertExpiresAt] = useState<number | null>(null);
+  const [transmitterConnected, setTransmitterConnected] = useState<
+    boolean | null
+  >(null);
   const stateRef = useRef<State>(INITIAL_STATE);
   const lastSeqRef = useRef(0);
   const serverLogRef = useRef<ServerLog | null>(null);
@@ -265,6 +275,39 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
       clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    const log = serverLogRef.current;
+    if (connection !== "connected" || log === null) {
+      return;
+    }
+    let disposed = false;
+    function poll(from: ServerLog): void {
+      void from.transmitterConnected().then((connected) => {
+        if (!disposed) {
+          setTransmitterConnected(connected);
+        }
+      });
+    }
+    poll(log);
+    const timer = setInterval(() => {
+      poll(log);
+    }, TRANSMITTER_POLL_MS);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      // A status from an earlier connection says nothing about the next one.
+      setTransmitterConnected(null);
+    };
+  }, [connection]);
+
+  const callPager = useCallback(
+    async (pager: number): Promise<PagerCallResult | null> => {
+      const log = serverLogRef.current;
+      return log === null ? null : log.callPager(pager);
+    },
+    [],
+  );
 
   const actionsEnabled =
     decide === null &&
@@ -478,6 +521,8 @@ export function usePagerBoard(showToast: (text: string) => void): PagerBoard {
     adoptServer,
     saveKitchenDisplay,
     endKitchenDisplay,
+    callPager,
+    transmitterConnected,
   };
 }
 

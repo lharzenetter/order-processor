@@ -16,3 +16,29 @@
   color: var(--white);
   font-weight: 700;
 }
+
+/* A staying toast must be tapped away, so it takes taps the others let through. */
+.staying {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--red);
+  pointer-events: auto;
+}
+
+.dismiss {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.action {
+  padding: 6px 12px;
+  border: 2px solid var(--white);
+  background: none;
+  color: var(--white);
+  font: inherit;
+}
