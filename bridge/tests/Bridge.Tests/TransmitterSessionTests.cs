@@ -30,6 +30,34 @@ public sealed class TransmitterSessionTests : IDisposable
     }
 
     [Fact(Timeout = 10_000)]
+    public async Task Learns_the_system_id_when_reads_come_back_empty_before_the_heartbeat()
+    {
+        // The Windows serial driver may end a read with no bytes or a timeout while the line is quiet.
+        port.ReadsNothing();
+        port.TimesOut();
+        port.Send(Heartbeat);
+
+        var session = await TransmitterSession.OpenAsync(port, time, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(session);
+        Assert.Equal(433, session.SystemId);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task Reads_that_come_back_empty_keep_the_transmitter_connected()
+    {
+        await using var session = await Open();
+
+        port.ReadsNothing();
+        port.TimesOut();
+        await port.Drained();
+
+        Assert.True(session.IsConnected);
+        port.OnWrite = _ => port.Send(CallOk);
+        Assert.Equal(CallResult.Ok, await session.CallAsync(21, TestContext.Current.CancellationToken));
+    }
+
+    [Fact(Timeout = 10_000)]
     public async Task A_port_without_a_valid_heartbeat_within_3_s_is_closed()
     {
         // #25: a heartbeat with a wrong checksum is not a valid one.

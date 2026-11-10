@@ -43,6 +43,9 @@ public sealed partial class WindowsSerialPortSource : ISerialPortSource, IDispos
         {
             Handshake = Handshake.None,
             RtsEnable = true,
+            // .NET's infinite read timeout hands the driver values the CH340 handles badly; a finite one
+            // reads the TD186 on the hardware (tools/td186-test.ps1). An empty read is no failure.
+            ReadTimeout = 500,
         };
         try
         {

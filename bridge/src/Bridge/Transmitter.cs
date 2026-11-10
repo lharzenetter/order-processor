@@ -75,6 +75,10 @@ public sealed partial class Transmitter(ISerialPortSource ports, TimeProvider ti
             }
         }
         await Task.WhenAll(opening.Select(o => o.Session)).ConfigureAwait(false);
+        foreach (var (silent, _) in opening.Where(o => o.Session.Result is null))
+        {
+            LogNoHeartbeat(silent);
+        }
         var answered = opening.Where(o => o.Session.Result is not null).ToList();
         if (answered.Count == 0)
         {
@@ -102,6 +106,9 @@ public sealed partial class Transmitter(ISerialPortSource ports, TimeProvider ti
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Transmitters answer on {Ports}; using {Port}")]
     private partial void LogSeveral(string ports, string port);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "No heartbeat on {Port} within 3 s")]
+    private partial void LogNoHeartbeat(string port);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Cannot open {Port}: {Reason}")]
     private partial void LogCannotOpen(string port, string reason);

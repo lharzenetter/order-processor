@@ -143,10 +143,20 @@ public sealed class TransmitterSession : IAsyncDisposable
         {
             while (true)
             {
-                var count = await port.ReadAsync(buffer, stopping.Token).ConfigureAwait(false);
+                int count;
+                try
+                {
+                    count = await port.ReadAsync(buffer, stopping.Token).ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                    continue;
+                }
+                // A serial port has no end of stream: the Windows driver ends a read on a quiet line with
+                // no bytes. A failed port throws; a silent one misses the 5 s heartbeat timeout.
                 if (count == 0)
                 {
-                    break;
+                    continue;
                 }
                 foreach (var frame in reader.Push(buffer.AsSpan(0, count)))
                 {

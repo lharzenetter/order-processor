@@ -5,7 +5,7 @@ namespace OrderProcessor.Bridge.Tests;
 /// <summary>A serial port with a scripted TD186 on the far end.</summary>
 public sealed class FakeSerialStream : Stream
 {
-    private readonly Channel<byte[]> incoming = Channel.CreateUnbounded<byte[]>();
+    private readonly Channel<Func<byte[]>> incoming = Channel.CreateUnbounded<Func<byte[]>>();
     private readonly Channel<byte[]> writes = Channel.CreateUnbounded<byte[]>();
     private readonly List<byte[]> written = [];
     private byte[] pending = [];
@@ -30,7 +30,15 @@ public sealed class FakeSerialStream : Stream
     }
 
     /// <summary>Bytes the transmitter sends to the bridge.</summary>
-    public void Send(params byte[] bytes)
+    public void Send(params byte[] bytes) => Enqueue(() => bytes);
+
+    /// <summary>The next read returns no bytes, as a Windows serial driver may.</summary>
+    public void ReadsNothing() => Enqueue(() => []);
+
+    /// <summary>The next read times out with nothing received.</summary>
+    public void TimesOut() => Enqueue(() => throw new TimeoutException("The operation has timed out."));
+
+    private void Enqueue(Func<byte[]> read)
     {
         lock (incoming)
         {
@@ -40,7 +48,7 @@ public sealed class FakeSerialStream : Stream
                 drained = NewSignal();
             }
         }
-        incoming.Writer.TryWrite(bytes);
+        incoming.Writer.TryWrite(read);
     }
 
     /// <summary>The cable is pulled: every read from now on fails.</summary>
@@ -71,9 +79,10 @@ public sealed class FakeSerialStream : Stream
                     drained.TrySetResult();
                 }
             }
+            Func<byte[]> read;
             try
             {
-                pending = await incoming.Reader.ReadAsync(cancellationToken);
+                read = await incoming.Reader.ReadAsync(cancellationToken);
             }
             catch (ChannelClosedException e) when (e.InnerException is { } inner)
             {
@@ -83,6 +92,7 @@ public sealed class FakeSerialStream : Stream
             {
                 queued--;
             }
+            pending = read();
         }
         var count = Math.Min(buffer.Length, pending.Length);
         pending.AsSpan(0, count).CopyTo(buffer.Span);
