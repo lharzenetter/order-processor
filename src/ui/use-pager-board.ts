@@ -88,8 +88,11 @@ export interface PagerBoard {
     productSelection: readonly string[],
   ) => Promise<void>;
   readonly endKitchenDisplay: () => Promise<void>;
-  /** Sends a pager call through the server, recording nothing; `null` when standalone. */
-  readonly callPager: (pager: number) => Promise<PagerCallResult | null>;
+  /**
+   * Sends a pager call through the server, recording nothing, and reports its result like a tap's
+   * call; does nothing when standalone.
+   */
+  readonly callPager: (pager: number) => Promise<void>;
   /** What the server last reported about the transmitter; `null` until connected and asked. */
   readonly transmitterConnected: boolean | null;
 }
@@ -310,13 +313,13 @@ export function usePagerBoard(
     };
   }, [connection]);
 
-  const callPager = useCallback(
-    async (pager: number): Promise<PagerCallResult | null> => {
-      const log = serverLogRef.current;
-      return log === null ? null : log.callPager(pager);
-    },
-    [],
-  );
+  const callPager = useCallback(async (pager: number): Promise<void> => {
+    const log = serverLogRef.current;
+    if (log === null) {
+      return;
+    }
+    onPagerCalledRef.current(pager, await log.callPager(pager));
+  }, []);
 
   const actionsEnabled =
     decide === null &&
@@ -346,10 +349,8 @@ export function usePagerBoard(
               // #23: only a tap the server appended calls, so a lost race never calls a guest.
               const pager =
                 serverLog === null ? null : pagerToCall(stateRef.current, body);
-              if (serverLog !== null && pager !== null) {
-                void serverLog.callPager(pager).then((called) => {
-                  onPagerCalledRef.current(pager, called);
-                });
+              if (pager !== null) {
+                void callPager(pager);
               }
               return stateRef.current;
             }
@@ -369,7 +370,7 @@ export function usePagerBoard(
       queueRef.current = run.catch(() => undefined);
       return run;
     },
-    [store, apply, showToast],
+    [store, apply, showToast, callPager],
   );
 
   const undo = useCallback(async (): Promise<string | null> => {

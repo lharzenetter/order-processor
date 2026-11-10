@@ -88,13 +88,6 @@ export function App() {
   }, [pending]);
 
   // #23: the result arrives on its own, after the tap; Erneut senden repeats only the call.
-  async function callPager(pager: number): Promise<void> {
-    const result = await board.callPager(pager);
-    if (result !== null) {
-      showPagerCall(pager, result);
-    }
-  }
-
   function showPagerCall(pager: number, result: PagerCallResult): void {
     const toast = pagerCallToast(pager, result);
     showToast(toast.text, {
@@ -104,7 +97,7 @@ export function App() {
             action: {
               label: "Erneut senden",
               run: () => {
-                void callPager(pager);
+                void board.callPager(pager);
               },
             },
           }
@@ -466,7 +459,7 @@ export function App() {
             setVerwaltungOpen(false);
           }}
           showToast={showToast}
-          onTestCall={callPager}
+          onTestCall={board.callPager}
           onSwitchPagerCalls={(on) => {
             void run({ type: "pagerCallsSwitched", on });
           }}
