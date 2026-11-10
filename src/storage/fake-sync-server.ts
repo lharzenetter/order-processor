@@ -1,4 +1,5 @@
 import { isRecord } from "./guards";
+import { isPagerCallResult } from "./server-log";
 import type { Fetch, SyncStream, StreamMessage } from "./server-log";
 
 /**
@@ -38,7 +39,6 @@ export interface FakeSyncServer {
 export const FAKE_PING_EVERY_MS = 10_000;
 // #23, as on the real server.
 const BRIDGE_TIMEOUT_MS = 3_000;
-const PAGER_CALL_RESULTS: readonly unknown[] = ["ok", "failed", "notConnected"];
 
 interface Replacement {
   readonly previousLogId: string | null;
@@ -152,9 +152,8 @@ export function createFakeSyncServer(
       method: "POST",
       body: JSON.stringify({ pager: body.pager }),
     });
-    const result = PAGER_CALL_RESULTS.includes(answer?.result)
-      ? answer?.result
-      : "notConnected";
+    const called = answer?.result;
+    const result = isPagerCallResult(called) ? called : "notConnected";
     return json(200, { result });
   }
 

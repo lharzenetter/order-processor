@@ -40,7 +40,7 @@ const PING_INTERVAL_MS = 10_000;
 const PREFLIGHT_MAX_AGE_MS = 86_400_000;
 // #23: a bridge that doesn't answer within this counts as not connected.
 const BRIDGE_TIMEOUT_MS = 3_000;
-const PAGER_CALL_RESULTS: readonly unknown[] = ["ok", "failed", "notConnected"];
+const PAGER_CALL_RESULTS = ["ok", "failed", "notConnected"] as const;
 
 // A browser EventSource never surfaces SSE comments, so the iPad's 25 s watchdog could not see a
 // bare `: ping`. The comment stays for proxies and curl; the named `ping` event is what the iPad
@@ -55,6 +55,12 @@ interface StreamClient {
 }
 
 type Body = Readonly<Record<string, unknown>>;
+
+function isPagerCallResult(
+  value: unknown,
+): value is (typeof PAGER_CALL_RESULTS)[number] {
+  return PAGER_CALL_RESULTS.some((result) => result === value);
+}
 
 function isRecord(value: unknown): value is Body {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -272,9 +278,8 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pager: body.value.pager }),
     });
-    const result = PAGER_CALL_RESULTS.includes(answer?.result)
-      ? answer?.result
-      : "notConnected";
+    const called = answer?.result;
+    const result = isPagerCallResult(called) ? called : "notConnected";
     return json(200, { result });
   }
 

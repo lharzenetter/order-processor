@@ -18,7 +18,7 @@ export type {
   SyncSettings,
 } from "./device-store";
 export { createFakeBridge } from "./fake-bridge";
-export type { BridgeAnswer, FakeBridge } from "./fake-bridge";
+export type { FakeBridge } from "./fake-bridge";
 export { createFakeSyncServer } from "./fake-sync-server";
 export type { FakeSyncServer } from "./fake-sync-server";
 export {
