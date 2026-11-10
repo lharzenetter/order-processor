@@ -40,8 +40,9 @@ pnpm build && pnpm preview --port 4173  # the only origin the local server accep
   button to change the Auswahl or end it.
 - `pnpm sync-server` also starts a fake pager bridge on `http://127.0.0.1:9186`, so _Verwaltung →
   Sender_ shows _Sender verbunden_, and a _Testruf_ or a buzz, re-buzz or hand on answers _Pager N
-  gerufen_. With `{"connected":false}` the header shows _Sender getrennt_ within 5 s. To try the
-  other answers, tell it what to say:
+  gerufen_. With `{"connected":false}` the header shows _Sender getrennt_ within 5 s. Switching
+  off _Pager automatisch rufen_ there stops the calls and the indicator on every iPad; the
+  _Testruf_ still works. To try the other answers, tell it what to say:
   `curl -X PUT 127.0.0.1:9186/fake -d '{"result":"failed"}'` (or `"notConnected"`, or
   `{"connected":false}`); `-d '{}'` resets it.
 - Every start of the server begins with an empty log.

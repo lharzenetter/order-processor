@@ -51,6 +51,7 @@ export function Verwaltung({
   onBack,
   showToast,
   onTestCall,
+  onSwitchPagerCalls,
 }: {
   mode: "full" | "recovery";
   board: PagerBoard;
@@ -59,6 +60,8 @@ export function Verwaltung({
   showToast: (text: string) => void;
   /** Sends a pager call and shows its result toast; records nothing. */
   onTestCall?: (pager: number) => Promise<void>;
+  /** Records a switch of automatic pager calls, for every iPad. */
+  onSwitchPagerCalls?: (on: boolean) => void;
 }) {
   const { state, meta, store, connection } = board;
   const onRefreshMeta = board.refreshMeta;
@@ -174,12 +177,18 @@ export function Verwaltung({
           }}
         />
       )}
-      {mode === "full" && synced && onTestCall !== undefined && (
-        <TransmitterSection
-          connected={board.transmitterConnected}
-          onTestCall={onTestCall}
-        />
-      )}
+      {mode === "full" &&
+        synced &&
+        onTestCall !== undefined &&
+        onSwitchPagerCalls !== undefined && (
+          <TransmitterSection
+            connected={board.transmitterConnected}
+            onTestCall={onTestCall}
+            pagerCallsOn={state.pagerCallsOn}
+            switchEnabled={board.actionsEnabled}
+            onSwitchPagerCalls={onSwitchPagerCalls}
+          />
+        )}
       <section className={styles.section}>
         <h2 className={shared.heading}>Aktionen</h2>
         <div className={styles.actions}>

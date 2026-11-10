@@ -64,7 +64,8 @@ export type EventBody =
   | { readonly type: "pagerRestored"; readonly pager: number }
   | { readonly type: "soldOutMarked"; readonly productId: string }
   | { readonly type: "soldOutCleared"; readonly productId: string }
-  | { readonly type: "actionUndone"; readonly targetId: string };
+  | { readonly type: "actionUndone"; readonly targetId: string }
+  | { readonly type: "pagerCallsSwitched"; readonly on: boolean };
 
 export type EventType = EventBody["type"];
 

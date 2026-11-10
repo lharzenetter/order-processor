@@ -23,6 +23,7 @@ const EVENT_FIELDS: Readonly<
   soldOutMarked: { productId: "string" },
   soldOutCleared: { productId: "string" },
   actionUndone: { targetId: "string" },
+  pagerCallsSwitched: { on: "boolean" },
 };
 
 export function isRecord(

@@ -37,6 +37,8 @@ export function describeEvent(event: Event, state: State): string {
       return `${labelOf(event.productId)} wieder verfügbar`;
     case "actionUndone":
       return "Rückgängig";
+    case "pagerCallsSwitched":
+      return `Pager automatisch rufen ${event.on ? "an" : "aus"}`;
     default:
       return assertNever(event);
   }

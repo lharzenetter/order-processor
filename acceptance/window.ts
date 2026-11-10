@@ -39,6 +39,8 @@ export interface Steps {
   restorePager(pager: number): Promise<void>;
   /** "Rückgängig" in the header: takes back whatever its subline names. */
   undo(): Promise<void>;
+  /** The "Pager automatisch rufen" switch in the Verwaltung, set to on or off. */
+  switchPagerCalls(switched: { on: boolean }): Promise<void>;
 }
 
 /**
@@ -178,6 +180,12 @@ export interface UndoSeen {
   offersNothing(): Promise<void>;
 }
 
+/** The "Pager automatisch rufen" switch in the Verwaltung. */
+export interface PagerCallsSeen {
+  areOn(): Promise<void>;
+  areOff(): Promise<void>;
+}
+
 /** A Kirbe day as staff write it, with a capital letter. */
 export type KirbeDayName = "Samstag" | "Sonntag" | "Montag";
 
@@ -257,6 +265,7 @@ export interface See {
   openOrdersList(): OpenOrdersListSeen;
   intake(): IntakeSeen;
   undo(): UndoSeen;
+  pagerCalls(): PagerCallsSeen;
   /** The Auswertung in the Verwaltung: "Gesamt", or the tab of one shift. */
   evaluation(shift?: ShiftName): EvaluationSeen;
   /** The Vergleich in the Auswertung, at the column of a shift or a crew. */

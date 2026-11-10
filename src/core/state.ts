@@ -47,6 +47,8 @@ export interface State {
   readonly soldOutFirstAt: Readonly<Record<string, number>>;
   /** The events in force, oldest first: neither undone nor an undo. Undo pops the newest. */
   readonly live: readonly Event[];
+  /** The newest `pagerCallsSwitched`; never in `live`, since undo skips it (#23). */
+  readonly pagerCallsOn: boolean;
 }
 
 export const INITIAL_STATE: State = {
@@ -55,4 +57,5 @@ export const INITIAL_STATE: State = {
   soldOut: [],
   soldOutFirstAt: {},
   live: [],
+  pagerCallsOn: true,
 };

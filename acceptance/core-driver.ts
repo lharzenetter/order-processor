@@ -528,6 +528,15 @@ export function coreWindow(): Window {
         append({ type: "actionUndone", targetId: target.event.id });
         return Promise.resolve();
       },
+      switchPagerCalls({ on }) {
+        if (state.pagerCallsOn === on) {
+          throw new Error(
+            `the Pager automatisch rufen switch is already ${on ? "on" : "off"}`,
+          );
+        }
+        append({ type: "pagerCallsSwitched", on });
+        return Promise.resolve();
+      },
     };
   }
 
@@ -800,6 +809,17 @@ export function coreWindow(): Window {
             return Promise.resolve();
           },
         };
+      },
+      pagerCalls() {
+        function expectOn(on: boolean): Promise<void> {
+          if (state.pagerCallsOn !== on) {
+            throw new Error(
+              `expected Pager automatisch rufen to be ${on ? "on" : "off"}, but it is ${on ? "off" : "on"}`,
+            );
+          }
+          return Promise.resolve();
+        }
+        return { areOn: () => expectOn(true), areOff: () => expectOn(false) };
       },
       evaluation(shift) {
         return {
