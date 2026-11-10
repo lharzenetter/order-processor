@@ -21,6 +21,7 @@ export {
   orderView,
   pagerCheck,
   pagerOverview,
+  pagerToCall,
   shiftComparison,
   soldOutWaiting,
   waitingPlates,
