@@ -42,8 +42,14 @@ export interface ServerLogOptions {
   readonly openStream: OpenStream;
 }
 
+export const PAGER_CALL_RESULTS = ["ok", "failed", "notConnected"] as const;
+
 /** The answer to a pager call (#23); an unreachable server or bridge is `notConnected`. */
-export type PagerCallResult = "ok" | "failed" | "notConnected";
+export type PagerCallResult = (typeof PAGER_CALL_RESULTS)[number];
+
+export function isPagerCallResult(value: unknown): value is PagerCallResult {
+  return PAGER_CALL_RESULTS.some((result) => result === value);
+}
 
 export type ReplaceResult =
   | { readonly kind: "replaced" }
@@ -213,15 +219,9 @@ function followedBy(
 }
 
 function toPagerCallResult(body: unknown): PagerCallResult {
-  if (
-    isRecord(body) &&
-    (body.result === "ok" ||
-      body.result === "failed" ||
-      body.result === "notConnected")
-  ) {
-    return body.result;
-  }
-  return "notConnected";
+  return isRecord(body) && isPagerCallResult(body.result)
+    ? body.result
+    : "notConnected";
 }
 
 function isPrefix(shorter: readonly string[], longer: readonly string[]) {

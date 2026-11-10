@@ -1,6 +1,4 @@
-import type { Fetch } from "./server-log";
-
-export type BridgeAnswer = "ok" | "failed" | "notConnected";
+import type { Fetch, PagerCallResult } from "./server-log";
 
 /**
  * A double of the pager bridge's HTTP API (#23: `POST /calls`, `GET /status`), for the server and
@@ -11,7 +9,7 @@ export interface FakeBridge {
   /** The pagers called, in order. */
   readonly calls: readonly number[];
   /** What the next pager calls are answered with (default ok). */
-  answerCalls(result: BridgeAnswer): void;
+  answerCalls(result: PagerCallResult): void;
   /** What `GET /status` reports (default connected). */
   connectTransmitter(connected: boolean): void;
   /** Every request fails as if nothing listened. */
@@ -22,7 +20,7 @@ export interface FakeBridge {
 
 export function createFakeBridge(): FakeBridge {
   const calls: number[] = [];
-  let result: BridgeAnswer = "ok";
+  let result: PagerCallResult = "ok";
   let connected = true;
   let failure: "unreachable" | "silent" | null = null;
 
