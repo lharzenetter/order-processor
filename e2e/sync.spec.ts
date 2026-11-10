@@ -8,6 +8,7 @@ test.describe.configure({ mode: "serial", timeout: 120_000 });
 const SERVER = "https://localhost:8443";
 const ADDRESS = "localhost:8443";
 const CODE = "KIRBE234";
+const BRIDGE = "http://127.0.0.1:9186";
 
 // Between flows the server starts a fresh, empty log; there is no test-only endpoint.
 test.beforeEach(async ({ request }) => {
@@ -26,6 +27,9 @@ test.beforeEach(async ({ request }) => {
     },
   });
   expect(reset.status()).toBe(200);
+  expect((await request.put(`${BRIDGE}/fake`, { data: {} })).status()).toBe(
+    200,
+  );
 });
 
 async function ipad(browser: Browser): Promise<Page> {
@@ -277,6 +281,56 @@ test("a Küchenanzeige shows only the waiting plates of its Auswahl", async ({
     kitchen.getByRole("button", { name: /^\+ Neue Bestellung/ }),
   ).toBeVisible();
   await connectedAs(kitchen, "Küche");
+});
+
+test("Testruf calls a pager from the Verwaltung and records nothing", async ({
+  browser,
+  request,
+}) => {
+  // #26
+  const page = await ipad(browser);
+  await connect(page, "Annahme");
+  await connectedAs(page, "Annahme");
+  const verwaltung = page.getByRole("region", { name: "Verwaltung" });
+  const sender = verwaltung.getByRole("region", { name: "Sender" });
+  await expect(sender).toContainText("Sender verbunden");
+
+  await sender.getByLabel("Testruf an Pager").fill("21");
+  await sender.getByRole("button", { name: "Rufen" }).click();
+  await expect(page.getByRole("status")).toContainText("Pager 21 gerufen");
+  // The short toast goes away by itself.
+  await expect(page.getByRole("status")).not.toContainText("Pager 21 gerufen");
+
+  await request.put(`${BRIDGE}/fake`, { data: { result: "failed" } });
+  await sender.getByRole("button", { name: "Rufen" }).click();
+  const failed = page.getByRole("status");
+  await expect(failed).toContainText("Pager 21 nicht gerufen");
+  await page.waitForTimeout(5_000);
+  await expect(failed).toContainText("Pager 21 nicht gerufen");
+
+  await request.put(`${BRIDGE}/fake`, { data: { result: "ok" } });
+  await failed.getByRole("button", { name: "Erneut senden" }).click();
+  await expect(failed).toContainText("Pager 21 gerufen");
+  await expect(failed).not.toContainText("nicht gerufen");
+  const bridge = (await (await request.get(`${BRIDGE}/fake`)).json()) as {
+    calls: number[];
+  };
+  expect(bridge.calls).toEqual([21]);
+
+  await request.put(`${BRIDGE}/fake`, {
+    data: { connected: false, result: "notConnected" },
+  });
+  await expect(sender).toContainText("Sender nicht verbunden", {
+    timeout: 10_000,
+  });
+  await sender.getByLabel("Testruf an Pager").fill("7");
+  await sender.getByRole("button", { name: "Rufen" }).click();
+  const byHand = "Sender nicht verbunden – Pager 7 von Hand rufen";
+  await expect(page.getByRole("status")).toContainText(byHand);
+  await page.getByRole("button", { name: `${byHand} – schließen` }).click();
+  await expect(page.getByRole("status")).not.toContainText(byHand);
+
+  await expect(verwaltung).toContainText("Ereignisse im Protokoll: 0");
 });
 
 test("standalone never reaches beyond this machine", async ({ page }) => {

@@ -31,6 +31,7 @@ export {
 export type {
   Fetch,
   OpenStream,
+  PagerCallResult,
   ReplaceResult,
   ServerLog,
   ServerLogOptions,

@@ -42,6 +42,9 @@ export interface ServerLogOptions {
   readonly openStream: OpenStream;
 }
 
+/** The answer to a pager call (#23); an unreachable server or bridge is `notConnected`. */
+export type PagerCallResult = "ok" | "failed" | "notConnected";
+
 export type ReplaceResult =
   | { readonly kind: "replaced" }
   /** The server's log was replaced by another iPad first; nothing changed here. */
@@ -64,6 +67,10 @@ export interface ServerLog extends EventLog {
   adoptServer(): Promise<void>;
   /** The certificate's expiry the server last reported, in ms. */
   certExpiresAt(): number | null;
+  /** Asks the server to call the pager; records nothing. */
+  callPager(pager: number): Promise<PagerCallResult>;
+  /** Whether the server reports the transmitter connected; `false` when it can't be asked. */
+  transmitterConnected(): Promise<boolean>;
 }
 
 /** The result of the Verbinden test. */
@@ -203,6 +210,18 @@ function followedBy(
     return { device, reason };
   }
   return undefined;
+}
+
+function toPagerCallResult(body: unknown): PagerCallResult {
+  if (
+    isRecord(body) &&
+    (body.result === "ok" ||
+      body.result === "failed" ||
+      body.result === "notConnected")
+  ) {
+    return body.result;
+  }
+  return "notConnected";
 }
 
 function isPrefix(shorter: readonly string[], longer: readonly string[]) {
@@ -786,6 +805,25 @@ export function createServerLog(options: ServerLogOptions): ServerLog {
     },
     certExpiresAt() {
       return certExpiresAt;
+    },
+    async callPager(pager) {
+      try {
+        const { status, body } = await call("/pager-calls", {
+          method: "POST",
+          body: { pager },
+        });
+        return status === 200 ? toPagerCallResult(body) : "notConnected";
+      } catch {
+        return "notConnected";
+      }
+    },
+    async transmitterConnected() {
+      try {
+        const { status, body } = await call("/transmitter");
+        return status === 200 && isRecord(body) && body.connected === true;
+      } catch {
+        return false;
+      }
     },
   };
 }

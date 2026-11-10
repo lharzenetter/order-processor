@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { FAKE_BRIDGE_PORT, startFakeBridge } from "./fake-bridge.ts";
 
 // Starts the real sync server for the e2e flows on https://localhost:8443, with a throwaway
 // certificate and a fresh data directory. It runs as Playwright's webServer, which starts before
@@ -52,5 +53,8 @@ process.env.CERT_FILE = cert;
 process.env.KEY_FILE = key;
 process.env.DATA_DIR = join(dir, "data");
 process.env.PORT = "8443";
+// The flows set what the fake bridge answers through its PUT /fake.
+startFakeBridge();
+process.env.BRIDGE_URL = `http://127.0.0.1:${String(FAKE_BRIDGE_PORT)}`;
 
 await import("../server/main.ts");
