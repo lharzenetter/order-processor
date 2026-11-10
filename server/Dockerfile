@@ -3,8 +3,8 @@
 FROM node:24.21-slim
 WORKDIR /app
 COPY server/ /app/server/
-# The default DATA_DIR for a container without a bind mount; on the Pi, data/ is mounted here and
-# must belong to uid 1000 (the node user).
+# The default DATA_DIR. On the venue machine the compose file's data volume is mounted here; a new
+# volume takes this directory's owner, uid 1000 (the node user).
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 8443

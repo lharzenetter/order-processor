@@ -141,8 +141,8 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v5
 
-  # Every release gets a server image, UI-only ones included. Never tagged latest: the Pi pins an
-  # exact version in .env.
+  # Every release gets a server image, UI-only ones included. Never tagged latest: the venue machine
+  # pins an exact version in .env.
   image:
     if: needs.release.outputs.published == 'true'
     needs: release
