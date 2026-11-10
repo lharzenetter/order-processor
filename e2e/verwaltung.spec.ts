@@ -110,6 +110,41 @@ test("Nach Updates suchen reports when it can't check", async ({ page }) => {
   ).toBeEnabled();
 });
 
+// spec, "Storage": a build that can't read the stored log offers only export and import.
+test("a log this build can't read opens the Verwaltung for export and import only", async ({
+  page,
+}) => {
+  await openApp(page);
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open("kirbe-pager");
+      request.onerror = () => {
+        reject(new Error("IndexedDB did not open"));
+      };
+      request.onsuccess = () => {
+        const tx = request.result.transaction("meta", "readwrite");
+        tx.objectStore("meta").put(2, "formatVersion");
+        tx.oncomplete = () => {
+          request.result.close();
+          resolve();
+        };
+      };
+    });
+  });
+  await page.reload();
+
+  const verwaltung = page.getByRole("region", { name: "Verwaltung" });
+  await expect(verwaltung.getByRole("alert")).toContainText(
+    "Diese Version kann das gespeicherte Protokoll nicht lesen.",
+  );
+  await expect(
+    verwaltung.getByRole("button", { name: "Exportieren" }),
+  ).toBeVisible();
+  await expect(verwaltung.getByRole("region", { name: "Sender" })).toHaveCount(
+    0,
+  );
+});
+
 test.describe("the Auswertung per Schicht", () => {
   test.use({ timezoneId: "Europe/Berlin" });
 
