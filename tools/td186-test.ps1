@@ -1,11 +1,13 @@
 # Bench test for the Retekess TD186 transmitter on Windows: listens for its heartbeat to learn the
-# System ID, then sends one call to a pager after confirmation. The frame layout was read from the
-# vendor's RetekessCM software and is not documented by Retekess.
+# System ID, then sends one frame after confirmation. The frame layout was read from the vendor's
+# RetekessCM software and is not documented by Retekess.
 #
 # Close the Retekess software first (COM ports are exclusive) and keep the antenna attached.
-# Usage: powershell -ExecutionPolicy Bypass -File .\td186-test.ps1 [-Port COM3] [-Pager 21] [-SystemId <F1 Host ID>]
+# Usage: powershell -ExecutionPolicy Bypass -File .\td186-test.ps1 [-Port COM3] [-Pager 21] [-Command 0x80] [-SystemId <F1 Host ID>]
+#
+# -Command 0x80 calls one pager. RetekessCM's group call is -Pager 16383 -Command 0x10 (pager 3FFF), #34.
 
-param([string]$Port = 'COM3', [int]$Pager = 21, [int]$SystemId = -1)
+param([string]$Port = 'COM3', [int]$Pager = 21, [int]$Command = 0x80, [int]$SystemId = -1)
 
 $sp = New-Object System.IO.Ports.SerialPort $Port, 9600, 'None', 8, 'One'
 $sp.RtsEnable = $true
@@ -38,11 +40,11 @@ for ($i = 0; $i -le $rx.Length - 10; $i++) {
 }
 if ($SystemId -lt 0) { $sp.Close(); throw 'No heartbeat seen. Re-run with -SystemId <Host ID from menu F1>.' }
 
-# Call: FE 9A | 05 SS SS NN NN 80 | CS 69, where CS is the byte sum of the middle part mod 256
-$body = [byte[]](0x05, ($SystemId -shr 8), ($SystemId -band 0xFF), ($Pager -shr 8), ($Pager -band 0xFF), 0x80)
+# Frame: FE 9A | 05 SS SS NN NN CC | CS 69, where CS is the byte sum of the middle part mod 256
+$body = [byte[]](0x05, ($SystemId -shr 8), ($SystemId -band 0xFF), ($Pager -shr 8), ($Pager -band 0xFF), $Command)
 $cs = ($body | Measure-Object -Sum).Sum % 256
 $frame = [byte[]](@(0xFE, 0x9A) + $body + @($cs, 0x69))
-Write-Host "Call frame for pager ${Pager}: $(Hex $frame)"
+Write-Host "Frame for pager $Pager, command 0x$($Command.ToString('X2')): $(Hex $frame)"
 
 if ((Read-Host 'Send it? (y/n)') -eq 'y') {
   $sp.DiscardInBuffer()
