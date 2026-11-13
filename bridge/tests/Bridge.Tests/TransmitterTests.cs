@@ -73,6 +73,19 @@ public sealed class TransmitterTests : IAsyncDisposable
     }
 
     [Fact(Timeout = 10_000)]
+    public async Task A_connected_transmitter_sends_the_group_call_and_the_power_off()
+    {
+        ports.Add("COM4", isCh340: true, TD186);
+        await transmitter.ConnectAsync(TestContext.Current.CancellationToken);
+
+        // #33
+        Assert.Equal(CallResult.Ok, await transmitter.GroupCallAsync(TestContext.Current.CancellationToken));
+        // #32
+        Assert.Equal(CallResult.Ok, await transmitter.PowerOffAsync(TestContext.Current.CancellationToken));
+        Assert.Equal([Frames.GroupCall(433), Frames.PowerOff(433)], (await ports.Opened("COM4")).Written);
+    }
+
+    [Fact(Timeout = 10_000)]
     public async Task A_port_that_cannot_be_opened_is_skipped()
     {
         ports.Add("COM2", isCh340: true, () => throw new UnauthorizedAccessException("Access to COM2 is denied."));
