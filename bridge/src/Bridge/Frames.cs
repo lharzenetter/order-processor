@@ -15,7 +15,16 @@ public static class Frames
 {
     public const int Length = 10;
 
-    public static byte[] Call(int systemId, int pager)
+    public static byte[] Call(int systemId, int pager) => Command(systemId, pager, 0x80);
+
+    /// <summary>
+    /// Calls every pager out of the charging base: pager <c>3FFF</c> with command <c>10</c>, the frame
+    /// the vendor app RetekessCM sends (#23, TD186 protocol). The venue's TD186 acks it with call OK
+    /// like a pager call (#34), so it needs no "frame written" fallback.
+    /// </summary>
+    public static byte[] GroupCall(int systemId) => Command(systemId, 0x3FFF, 0x10);
+
+    private static byte[] Command(int systemId, int pager, byte command)
     {
         byte[] frame =
         [
@@ -26,7 +35,7 @@ public static class Frames
             (byte)systemId,
             (byte)(pager >> 8),
             (byte)pager,
-            0x80,
+            command,
             0,
             0x69,
         ];

@@ -76,9 +76,16 @@ public sealed class TransmitterSession : IAsyncDisposable
     }
 
     /// <summary>Queues a pager call; calls go out one at a time, in the order they arrive.</summary>
-    public async Task<CallResult> CallAsync(int pager, CancellationToken cancellationToken)
+    public Task<CallResult> CallAsync(int pager, CancellationToken cancellationToken) =>
+        EnqueueAsync(Frames.Call(SystemId, pager), cancellationToken);
+
+    /// <summary>Queues a group call, in turn with the pager calls (#33).</summary>
+    public Task<CallResult> GroupCallAsync(CancellationToken cancellationToken) =>
+        EnqueueAsync(Frames.GroupCall(SystemId), cancellationToken);
+
+    private async Task<CallResult> EnqueueAsync(byte[] frame, CancellationToken cancellationToken)
     {
-        var call = new PendingCall(pager);
+        var call = new PendingCall(frame);
         if (!calls.Writer.TryWrite(call))
         {
             return CallResult.NotConnected;
@@ -90,11 +97,11 @@ public sealed class TransmitterSession : IAsyncDisposable
     {
         await foreach (var call in calls.Reader.ReadAllAsync(CancellationToken.None).ConfigureAwait(false))
         {
-            call.Result.TrySetResult(await SendAsync(call.Pager).ConfigureAwait(false));
+            call.Result.TrySetResult(await SendAsync(call.Frame).ConfigureAwait(false));
         }
     }
 
-    private async Task<CallResult> SendAsync(int pager)
+    private async Task<CallResult> SendAsync(byte[] frame)
     {
         if (!IsConnected)
         {
@@ -106,7 +113,7 @@ public sealed class TransmitterSession : IAsyncDisposable
         using var timeout = new CancellationTokenSource(CallTimeout, time);
         try
         {
-            await port.WriteAsync(Frames.Call(SystemId, pager), stopping.Token).ConfigureAwait(false);
+            await port.WriteAsync(frame, stopping.Token).ConfigureAwait(false);
             await Task.WhenAny(expected.Task, lost.Task).WaitAsync(timeout.Token).ConfigureAwait(false);
             if (!expected.Task.IsCompleted)
             {
@@ -197,7 +204,7 @@ public sealed class TransmitterSession : IAsyncDisposable
         stopping.Dispose();
     }
 
-    private sealed record PendingCall(int Pager)
+    private sealed record PendingCall(byte[] Frame)
     {
         public TaskCompletionSource<CallResult> Result { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);

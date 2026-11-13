@@ -46,6 +46,11 @@ public sealed partial class Transmitter(ISerialPortSource ports, TimeProvider ti
             ? current.CallAsync(pager, cancellationToken)
             : Task.FromResult(CallResult.NotConnected);
 
+    public Task<CallResult> GroupCallAsync(CancellationToken cancellationToken) =>
+        Volatile.Read(ref session) is { IsConnected: true } current
+            ? current.GroupCallAsync(cancellationToken)
+            : Task.FromResult(CallResult.NotConnected);
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref session, null) is { } current)

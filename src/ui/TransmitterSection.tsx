@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { PAGER_COUNT } from "../core/index";
 import { cx } from "./cx";
+import { groupCallQuestion } from "./group-call";
+import { ModalDialog } from "./ModalDialog";
 import styles from "./ServerSection.module.css";
 import shared from "./shared.module.css";
 
@@ -21,18 +23,23 @@ function statusText(connected: boolean | null): string {
 }
 
 /**
- * The Verwaltung's transmitter check in sync mode: its status, a Testruf that records nothing, and
- * the Pager automatisch rufen switch for every iPad. Status and Testruf work with the switch off.
+ * The Verwaltung's transmitter check in sync mode: its status, a Testruf and the group call, which
+ * record nothing, and the Pager automatisch rufen switch for every iPad. Status, Testruf and group
+ * call work with the switch off.
  */
 export function TransmitterSection({
   connected,
   onTestCall,
+  openOrders,
+  onGroupCall,
   pagerCallsOn,
   switchEnabled,
   onSwitchPagerCalls,
 }: {
   connected: boolean | null;
   onTestCall: (pager: number) => Promise<void>;
+  openOrders: number;
+  onGroupCall: () => Promise<void>;
   pagerCallsOn: boolean;
   /** The switch is recorded, so like every tap it needs the server to count it. */
   switchEnabled: boolean;
@@ -40,7 +47,18 @@ export function TransmitterSection({
 }) {
   const [digits, setDigits] = useState("");
   const [calling, setCalling] = useState(false);
+  const [groupCalling, setGroupCalling] = useState(false);
+  const [confirmingGroupCall, setConfirmingGroupCall] = useState(false);
   const pager = testCallPager(digits);
+  const groupCallAsks = groupCallQuestion(openOrders);
+
+  function sendGroupCall(): void {
+    setConfirmingGroupCall(false);
+    setGroupCalling(true);
+    void onGroupCall().finally(() => {
+      setGroupCalling(false);
+    });
+  }
 
   return (
     <section className={styles.section} aria-label="Sender">
@@ -76,6 +94,48 @@ export function TransmitterSection({
           {calling ? "Rufe…" : "Rufen"}
         </button>
       </div>
+      <div className={cx(shared.row, styles.buttons)}>
+        <button
+          type="button"
+          disabled={groupCalling}
+          onClick={() => {
+            if (groupCallAsks === null) {
+              sendGroupCall();
+            } else {
+              setConfirmingGroupCall(true);
+            }
+          }}
+        >
+          {groupCalling ? "Rufe alle Pager…" : "Alle Pager rufen"}
+        </button>
+      </div>
+      {confirmingGroupCall && groupCallAsks !== null && (
+        <ModalDialog
+          title="Alle Pager rufen"
+          onClose={() => {
+            setConfirmingGroupCall(false);
+          }}
+        >
+          <p>{groupCallAsks}</p>
+          <div className={shared.row}>
+            <button
+              type="button"
+              className={shared.primary}
+              onClick={sendGroupCall}
+            >
+              Alle Pager rufen
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingGroupCall(false);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </ModalDialog>
+      )}
       <label className={styles.toggle}>
         <input
           type="checkbox"

@@ -333,6 +333,7 @@ this list, the same way every time:
 - [ ] Bridge service finds the transmitter after boot, whatever the COM number. The Verwaltung shows _Sender verbunden_.
 - [ ] _Testruf_ to one pager: it vibrates, _Pager N gerufen_.
 - [ ] Range: _Testruf_ from the window while someone carries pagers to the far corners of the grounds and behind the building.
+- [ ] _Alle Pager rufen_ with a few pagers out of the charging base: those vibrate, the ones in the base don't, _Alle Pager gerufen_.
 - [ ] Unplug the USB cable: _Sender getrennt_ within seconds, a buzz shows the staying toast. Plug it back in: the indicator goes away without touching the PC.
 - [ ] Reboot the PC: calls work again without anyone logging in.
 - [ ] Stop the bridge service: _Sender nicht verbunden_.
@@ -343,6 +344,8 @@ Notes for the list:
 
 - _Testruf_ is in _Verwaltung → Sender_: enter the pager number under _Testruf an Pager_, tap
   _Rufen_. It records nothing.
+- _Alle Pager rufen_ is below it. At closing time it finds the pagers not yet returned; while
+  orders are open, it asks first. It records nothing.
 - Stop and start the bridge as administrator with `Stop-Service order-processor-bridge` and
   `Start-Service order-processor-bridge`. Start it again after that check.
 - The buzz checks record real taps: run them before the Fest starts, then start it with an empty

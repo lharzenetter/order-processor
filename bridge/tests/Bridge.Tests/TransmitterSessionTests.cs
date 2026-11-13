@@ -162,6 +162,60 @@ public sealed class TransmitterSessionTests : IDisposable
         Assert.False(session.IsConnected);
     }
 
+    [Fact(Timeout = 10_000)]
+    public async Task A_group_call_sends_the_vendor_group_call_frame_and_reports_ok()
+    {
+        // #33: pager 3FFF with command 10, acked with call OK on the venue's TD186 (#34).
+        byte[] groupCall = [0xFE, 0x9A, 0x05, 0x01, 0xB1, 0x3F, 0xFF, 0x10, 0x05, 0x69];
+        await using var session = await Open();
+        port.OnWrite = _ => port.Send(CallOk);
+
+        var result = await session.GroupCallAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(CallResult.Ok, result);
+        Assert.Equal([groupCall], port.Written);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task A_group_call_answered_with_call_failed_reports_failed()
+    {
+        // #33
+        await using var session = await Open();
+        port.OnWrite = _ => port.Send(CallFailed);
+
+        Assert.Equal(CallResult.Failed, await session.GroupCallAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task A_group_call_without_a_heartbeat_for_5_s_reports_not_connected()
+    {
+        // #33
+        await using var session = await Open();
+        time.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(CallResult.NotConnected, await session.GroupCallAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(port.Written);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task A_group_call_waits_its_turn_behind_a_pager_call()
+    {
+        // #33
+        await using var session = await Open();
+
+        var call = session.CallAsync(21, TestContext.Current.CancellationToken);
+        var groupCall = session.GroupCallAsync(TestContext.Current.CancellationToken);
+        await port.NextWrite();
+        Assert.Single(port.Written);
+        port.Send(CallOk);
+        await port.NextWrite();
+        port.Send(CallOk);
+
+        Assert.Equal(CallResult.Ok, await call);
+        Assert.Equal(CallResult.Ok, await groupCall);
+        Assert.Equal([0x80, 0x10], port.Written.Select(frame => (int)frame[7]));
+    }
+
     private async Task<TransmitterSession> Open()
     {
         port.Send(Heartbeat);

@@ -65,6 +65,8 @@ public sealed class TransmitterTests : IAsyncDisposable
 
         Assert.False(transmitter.IsConnected);
         Assert.Equal(CallResult.NotConnected, await transmitter.CallAsync(21, TestContext.Current.CancellationToken));
+        // #33
+        Assert.Equal(CallResult.NotConnected, await transmitter.GroupCallAsync(TestContext.Current.CancellationToken));
         Assert.True((await ports.Opened("COM1")).Disposed);
     }
 

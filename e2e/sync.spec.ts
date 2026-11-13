@@ -296,13 +296,13 @@ test("Testruf calls a pager from the Verwaltung and records nothing", async ({
   await expect(sender).toContainText("Sender verbunden");
 
   await sender.getByLabel("Testruf an Pager").fill("21");
-  await sender.getByRole("button", { name: "Rufen" }).click();
+  await sender.getByRole("button", { name: "Rufen", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Pager 21 gerufen");
   // The short toast goes away by itself.
   await expect(page.getByRole("status")).not.toContainText("Pager 21 gerufen");
 
   await request.put(`${BRIDGE}/fake`, { data: { result: "failed" } });
-  await sender.getByRole("button", { name: "Rufen" }).click();
+  await sender.getByRole("button", { name: "Rufen", exact: true }).click();
   const failed = page.getByRole("status");
   await expect(failed).toContainText("Pager 21 nicht gerufen");
   await page.waitForTimeout(5_000);
@@ -324,13 +324,76 @@ test("Testruf calls a pager from the Verwaltung and records nothing", async ({
     timeout: 10_000,
   });
   await sender.getByLabel("Testruf an Pager").fill("7");
-  await sender.getByRole("button", { name: "Rufen" }).click();
+  await sender.getByRole("button", { name: "Rufen", exact: true }).click();
   const byHand = "Sender nicht verbunden – Pager 7 von Hand rufen";
   await expect(page.getByRole("status")).toContainText(byHand);
   await page.getByRole("button", { name: `${byHand} – schließen` }).click();
   await expect(page.getByRole("status")).not.toContainText(byHand);
 
   await expect(verwaltung).toContainText("Ereignisse im Protokoll: 0");
+});
+
+test("Alle Pager rufen sends the group call from the Verwaltung, asking first while orders are open", async ({
+  browser,
+  request,
+}) => {
+  // #33
+  async function groupCalls(): Promise<number> {
+    const fake = (await (await request.get(`${BRIDGE}/fake`)).json()) as {
+      groupCalls: number;
+    };
+    return fake.groupCalls;
+  }
+  const page = await ipad(browser);
+  await connect(page, "Annahme");
+  await connectedAs(page, "Annahme");
+  const verwaltung = page.getByRole("region", { name: "Verwaltung" });
+  const sender = verwaltung.getByRole("region", { name: "Sender" });
+  await expect(sender).toContainText("Sender verbunden");
+  const automaticCalls = sender.getByRole("switch", {
+    name: /Pager automatisch rufen/,
+  });
+  await automaticCalls.click();
+  await expect(automaticCalls).not.toBeChecked();
+
+  // With no open order it goes out right away, with automatic pager calls off, recording nothing.
+  await sender.getByRole("button", { name: "Alle Pager rufen" }).click();
+  await expect(page.getByRole("status")).toContainText("Alle Pager gerufen");
+  await expect.poll(groupCalls).toBe(1);
+  // The server's log holds the switch alone.
+  const log = (await (
+    await request.get(`${SERVER}/log`, { headers: { "X-Pairing-Code": CODE } })
+  ).json()) as { lastSeq: number };
+  expect(log.lastSeq).toBe(1);
+
+  await closeVerwaltung(page);
+  await takeOrder(page, { Braten: 1 }, 12);
+  await takeOrder(page, { Pommes: 1 }, 5);
+  await openVerwaltung(page);
+  await request.put(`${BRIDGE}/fake`, { data: { result: "failed" } });
+  await sender.getByRole("button", { name: "Alle Pager rufen" }).click();
+  const confirm = page.getByRole("dialog", { name: "Alle Pager rufen" });
+  await expect(confirm).toContainText(
+    "2 Bestellungen noch offen. Trotzdem alle Pager rufen?",
+  );
+  expect(await groupCalls()).toBe(0);
+  await confirm.getByRole("button", { name: "Alle Pager rufen" }).click();
+  const failed = page.getByRole("status");
+  await expect(failed).toContainText("Alle Pager rufen fehlgeschlagen");
+
+  await request.put(`${BRIDGE}/fake`, { data: { result: "ok" } });
+  await failed.getByRole("button", { name: "Erneut senden" }).click();
+  await expect(failed).toContainText("Alle Pager gerufen");
+  expect(await groupCalls()).toBe(1);
+
+  await request.put(`${BRIDGE}/fake`, {
+    data: { connected: false, result: "notConnected" },
+  });
+  await sender.getByRole("button", { name: "Alle Pager rufen" }).click();
+  await confirm.getByRole("button", { name: "Alle Pager rufen" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Sender nicht verbunden",
+  );
 });
 
 test("buzz, re-buzz and hand on call the pager of the order the plate is now with", async ({
@@ -475,7 +538,7 @@ test("Pager automatisch rufen switches pager calls off for every iPad", async ({
 
   // Testruf still calls with automatic pager calls off.
   await sender.getByLabel("Testruf an Pager").fill("7");
-  await sender.getByRole("button", { name: "Rufen" }).click();
+  await sender.getByRole("button", { name: "Rufen", exact: true }).click();
   await expect(annahme.getByRole("status")).toContainText(
     "Sender nicht verbunden – Pager 7 von Hand rufen",
   );

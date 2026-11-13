@@ -93,6 +93,8 @@ export interface PagerBoard {
    * call; does nothing when standalone.
    */
   readonly callPager: (pager: number) => Promise<void>;
+  /** Sends the group call through the server, recording nothing; `null` when standalone (#33). */
+  readonly sendGroupCall: () => Promise<PagerCallResult | null>;
   /** What the server last reported about the transmitter; `null` until connected and asked. */
   readonly transmitterConnected: boolean | null;
 }
@@ -321,6 +323,11 @@ export function usePagerBoard(
     onPagerCalledRef.current(pager, await log.callPager(pager));
   }, []);
 
+  const sendGroupCall = useCallback(async () => {
+    const log = serverLogRef.current;
+    return log === null ? null : log.sendGroupCall();
+  }, []);
+
   const actionsEnabled =
     decide === null &&
     !pending &&
@@ -541,6 +548,7 @@ export function usePagerBoard(
     saveKitchenDisplay,
     endKitchenDisplay,
     callPager,
+    sendGroupCall,
     transmitterConnected,
   };
 }

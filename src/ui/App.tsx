@@ -19,7 +19,9 @@ import { Header } from "./Header";
 import { IntakeDialog } from "./IntakeDialog";
 import { KitchenDisplay } from "./KitchenDisplay";
 import { OrderDialog } from "./OrderDialog";
+import { groupCallToast } from "./group-call";
 import { pagerCallToast } from "./pager-call-toast";
+import type { PagerCallToast } from "./pager-call-toast";
 import type { LineActions } from "./OrderDialog";
 import shared from "./shared.module.css";
 import {
@@ -89,7 +91,22 @@ export function App() {
 
   // #23: the result arrives on its own, after the tap; Erneut senden repeats only the call.
   function showPagerCall(pager: number, result: PagerCallResult): void {
-    const toast = pagerCallToast(pager, result);
+    showCallToast(pagerCallToast(pager, result), () => {
+      void board.callPager(pager);
+    });
+  }
+
+  // #33: like a Testruf, the group call's result shows as a toast and records nothing.
+  async function sendGroupCall(): Promise<void> {
+    const result = await board.sendGroupCall();
+    if (result !== null) {
+      showCallToast(groupCallToast(result), () => {
+        void sendGroupCall();
+      });
+    }
+  }
+
+  function showCallToast(toast: PagerCallToast, resend: () => void): void {
     showToast(
       toast.text,
       toast.stays
@@ -99,9 +116,7 @@ export function App() {
               ? {
                   action: {
                     label: "Erneut senden",
-                    run: () => {
-                      void board.callPager(pager);
-                    },
+                    run: resend,
                   },
                 }
               : {}),
@@ -211,6 +226,7 @@ export function App() {
           device={device}
           showToast={showToast}
           onTestCall={board.callPager}
+          onGroupCall={sendGroupCall}
           onSwitchPagerCalls={(on) => {
             void run({ type: "pagerCallsSwitched", on });
           }}
@@ -469,6 +485,7 @@ export function App() {
           }}
           showToast={showToast}
           onTestCall={board.callPager}
+          onGroupCall={sendGroupCall}
           onSwitchPagerCalls={(on) => {
             void run({ type: "pagerCallsSwitched", on });
           }}

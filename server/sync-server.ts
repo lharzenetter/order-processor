@@ -62,6 +62,13 @@ function isPagerCallResult(
   return PAGER_CALL_RESULTS.some((result) => result === value);
 }
 
+// #23, #33: an answer the bridge didn't give, or gave garbage for, counts as not connected.
+function callResult(answer: Body | undefined): Response {
+  const called = answer?.result;
+  const result = isPagerCallResult(called) ? called : "notConnected";
+  return json(200, { result });
+}
+
 function isRecord(value: unknown): value is Body {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -278,9 +285,15 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pager: body.value.pager }),
     });
-    const called = answer?.result;
-    const result = isPagerCallResult(called) ? called : "notConnected";
-    return json(200, { result });
+    return callResult(answer);
+  }
+
+  // #33: the body is ignored; the server relays the group call and knows nothing about orders.
+  async function postGroupCall(): Promise<Response> {
+    const answer = await askBridge(bridgeFetch, `${bridgeUrl}/group-calls`, {
+      method: "POST",
+    });
+    return callResult(answer);
   }
 
   async function getTransmitter(): Promise<Response> {
@@ -363,6 +376,7 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
       "POST /log/events": () => postEvent(request),
       "PUT /log": () => putLog(request),
       "POST /pager-calls": () => postPagerCall(request),
+      "POST /group-calls": postGroupCall,
       "GET /transmitter": getTransmitter,
     };
     const handler = handlers[endpoint];

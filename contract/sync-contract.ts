@@ -245,6 +245,56 @@ export function describeSyncContract(
       });
     });
 
+    async function groupCall(code?: string) {
+      return call("/group-calls", {
+        method: "POST",
+        ...(code === undefined ? {} : { code }),
+      });
+    }
+
+    describe("group calls", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("relays a group call and passes each bridge answer on", async () => {
+        // #33
+        for (const result of ["ok", "failed", "notConnected"] as const) {
+          target.bridge.answerCalls(result);
+          expect(await groupCall()).toEqual({ status: 200, body: { result } });
+        }
+        expect(target.bridge.groupCalls).toBe(3);
+        expect(target.bridge.calls).toEqual([]);
+      });
+
+      it("refuses a group call without the pairing code", async () => {
+        // #33
+        expect((await groupCall("WRONG234")).status).toBe(401);
+        expect(target.bridge.groupCalls).toBe(0);
+      });
+
+      it("counts an unreachable bridge as not connected", async () => {
+        // #33
+        target.bridge.goUnreachable();
+        expect((await groupCall()).body).toEqual({ result: "notConnected" });
+      });
+
+      it("counts a bridge silent for 3 s as not connected", async () => {
+        // #33
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        target.bridge.goSilent();
+        const called = groupCall();
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect((await called).body).toEqual({ result: "notConnected" });
+      });
+
+      it("counts a bridge answer it cannot read as not connected", async () => {
+        // #33
+        target.bridge.answerGarbage();
+        expect((await groupCall()).body).toEqual({ result: "notConnected" });
+      });
+    });
+
     it.runIf(name === "the real server")(
       "archives the replaced log as a file this app can import",
       async () => {

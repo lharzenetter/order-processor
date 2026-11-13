@@ -49,6 +49,11 @@ app.MapPost(
             ? Results.Ok(new { result = await transmitter.CallAsync(pager, cancellationToken) })
             : Results.BadRequest()
 );
+app.MapPost(
+    "/group-calls",
+    async (Transmitter transmitter, CancellationToken cancellationToken) =>
+        Results.Ok(new { result = await transmitter.GroupCallAsync(cancellationToken) })
+);
 app.MapGet("/status", (Transmitter transmitter) => new { connected = transmitter.IsConnected });
 
 await app.RunAsync();

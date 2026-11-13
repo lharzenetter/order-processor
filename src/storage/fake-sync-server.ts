@@ -152,6 +152,16 @@ export function createFakeSyncServer(
       method: "POST",
       body: JSON.stringify({ pager: body.pager }),
     });
+    return callResult(answer);
+  }
+
+  async function groupCall(): Promise<Response> {
+    return callResult(await askBridge("/group-calls", { method: "POST" }));
+  }
+
+  function callResult(
+    answer: Readonly<Record<string, unknown>> | undefined,
+  ): Response {
     const called = answer?.result;
     const result = isPagerCallResult(called) ? called : "notConnected";
     return json(200, { result });
@@ -170,6 +180,8 @@ export function createFakeSyncServer(
     switch (`${method} ${url.pathname}`) {
       case "POST /pager-calls":
         return pagerCall(body);
+      case "POST /group-calls":
+        return groupCall();
       case "GET /transmitter":
         return transmitter();
       case "GET /log":

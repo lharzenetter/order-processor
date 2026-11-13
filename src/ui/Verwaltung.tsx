@@ -51,6 +51,7 @@ export function Verwaltung({
   onBack,
   showToast,
   onTestCall,
+  onGroupCall,
   onSwitchPagerCalls,
 }: {
   mode: "full" | "recovery";
@@ -60,6 +61,8 @@ export function Verwaltung({
   showToast: (text: string) => void;
   /** Sends a pager call and shows its result toast; records nothing. */
   onTestCall: (pager: number) => Promise<void>;
+  /** Sends the group call and shows its result toast; records nothing. */
+  onGroupCall: () => Promise<void>;
   /** Records a switch of automatic pager calls, for every iPad. */
   onSwitchPagerCalls: (on: boolean) => void;
 }) {
@@ -181,6 +184,8 @@ export function Verwaltung({
         <TransmitterSection
           connected={board.transmitterConnected}
           onTestCall={onTestCall}
+          openOrders={headerCounts(state).openOrders}
+          onGroupCall={onGroupCall}
           pagerCallsOn={state.pagerCallsOn}
           switchEnabled={board.actionsEnabled}
           onSwitchPagerCalls={onSwitchPagerCalls}

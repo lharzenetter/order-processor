@@ -1,17 +1,22 @@
 import type { Fetch, PagerCallResult } from "./server-log";
 
 /**
- * A double of the pager bridge's HTTP API (#23: `POST /calls`, `GET /status`), for the server and
- * its fake to relay to. Its switches stand for the bridge's answers and its failures.
+ * A double of the pager bridge's HTTP API (#23: `POST /calls`, `GET /status`; #33:
+ * `POST /group-calls`), for the server and its fake to relay to. Its switches stand for the
+ * bridge's answers and its failures.
  */
 export interface FakeBridge {
   readonly fetch: Fetch;
   /** The pagers called, in order. */
   readonly calls: readonly number[];
-  /** What the next pager calls are answered with (default ok). */
+  /** How many group calls arrived. */
+  readonly groupCalls: number;
+  /** What the next pager and group calls are answered with (default ok). */
   answerCalls(result: PagerCallResult): void;
   /** What `GET /status` reports (default connected). */
   connectTransmitter(connected: boolean): void;
+  /** Calls are answered with a body that holds no result. */
+  answerGarbage(): void;
   /** Every request fails as if nothing listened. */
   goUnreachable(): void;
   /** Requests are taken but never answered. */
@@ -20,9 +25,16 @@ export interface FakeBridge {
 
 export function createFakeBridge(): FakeBridge {
   const calls: number[] = [];
+  let groupCalls = 0;
   let result: PagerCallResult = "ok";
   let connected = true;
-  let failure: "unreachable" | "silent" | null = null;
+  let failure: "unreachable" | "silent" | "garbage" | null = null;
+
+  function callAnswer(): Response {
+    return failure === "garbage"
+      ? new Response("<html>", { status: 200 })
+      : Response.json({ result });
+  }
 
   function answer(method: string, url: URL, body: unknown): Response {
     if (method === "POST" && url.pathname === "/calls") {
@@ -33,7 +45,11 @@ export function createFakeBridge(): FakeBridge {
       if (typeof pager === "number") {
         calls.push(pager);
       }
-      return Response.json({ result });
+      return callAnswer();
+    }
+    if (method === "POST" && url.pathname === "/group-calls") {
+      groupCalls += 1;
+      return callAnswer();
     }
     if (method === "GET" && url.pathname === "/status") {
       return Response.json({ connected });
@@ -62,11 +78,17 @@ export function createFakeBridge(): FakeBridge {
     get calls() {
       return calls;
     },
+    get groupCalls() {
+      return groupCalls;
+    },
     answerCalls(next) {
       result = next;
     },
     connectTransmitter(next) {
       connected = next;
+    },
+    answerGarbage() {
+      failure = "garbage";
     },
     goUnreachable() {
       failure = "unreachable";
