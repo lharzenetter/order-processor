@@ -293,6 +293,20 @@ export function createServerLog(options: ServerLogOptions): ServerLog {
     return request(options.fetch, settings, path, init);
   }
 
+  async function relayCall(
+    path: string,
+    body?: unknown,
+  ): Promise<PagerCallResult> {
+    try {
+      const response = await call(path, { method: "POST", body });
+      return response.status === 200
+        ? toPagerCallResult(response.body)
+        : "notConnected";
+    } catch {
+      return "notConnected";
+    }
+  }
+
   function stopTimers(): void {
     if (watchdog !== null) {
       clearTimeout(watchdog);
@@ -810,36 +824,14 @@ export function createServerLog(options: ServerLogOptions): ServerLog {
     certExpiresAt() {
       return certExpiresAt;
     },
-    async callPager(pager) {
-      try {
-        const { status, body } = await call("/pager-calls", {
-          method: "POST",
-          body: { pager },
-        });
-        return status === 200 ? toPagerCallResult(body) : "notConnected";
-      } catch {
-        return "notConnected";
-      }
+    callPager(pager) {
+      return relayCall("/pager-calls", { pager });
     },
-    async sendGroupCall() {
-      try {
-        const { status, body } = await call("/group-calls", {
-          method: "POST",
-        });
-        return status === 200 ? toPagerCallResult(body) : "notConnected";
-      } catch {
-        return "notConnected";
-      }
+    sendGroupCall() {
+      return relayCall("/group-calls");
     },
-    async sendPowerOff() {
-      try {
-        const { status, body } = await call("/power-offs", {
-          method: "POST",
-        });
-        return status === 200 ? toPagerCallResult(body) : "notConnected";
-      } catch {
-        return "notConnected";
-      }
+    sendPowerOff() {
+      return relayCall("/power-offs");
     },
     async transmitterConnected() {
       try {

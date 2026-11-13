@@ -42,19 +42,13 @@ public sealed partial class Transmitter(ISerialPortSource ports, TimeProvider ti
     }
 
     public Task<CallResult> CallAsync(int pager, CancellationToken cancellationToken) =>
-        Volatile.Read(ref session) is { IsConnected: true } current
-            ? current.CallAsync(pager, cancellationToken)
-            : Task.FromResult(CallResult.NotConnected);
+        OnSession(current => current.CallAsync(pager, cancellationToken));
 
     public Task<CallResult> GroupCallAsync(CancellationToken cancellationToken) =>
-        Volatile.Read(ref session) is { IsConnected: true } current
-            ? current.GroupCallAsync(cancellationToken)
-            : Task.FromResult(CallResult.NotConnected);
+        OnSession(current => current.GroupCallAsync(cancellationToken));
 
     public Task<CallResult> PowerOffAsync(CancellationToken cancellationToken) =>
-        Volatile.Read(ref session) is { IsConnected: true } current
-            ? current.PowerOffAsync(cancellationToken)
-            : Task.FromResult(CallResult.NotConnected);
+        OnSession(current => current.PowerOffAsync(cancellationToken));
 
     public async ValueTask DisposeAsync()
     {
@@ -63,6 +57,11 @@ public sealed partial class Transmitter(ISerialPortSource ports, TimeProvider ti
             await current.DisposeAsync().ConfigureAwait(false);
         }
     }
+
+    private Task<CallResult> OnSession(Func<TransmitterSession, Task<CallResult>> send) =>
+        Volatile.Read(ref session) is { IsConnected: true } current
+            ? send(current)
+            : Task.FromResult(CallResult.NotConnected);
 
     // Opens every candidate at once, so a scan takes about 3 s however many ports there are.
     private async Task<TransmitterSession?> FindAsync(

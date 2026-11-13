@@ -550,6 +550,24 @@ describe("pager calls", () => {
     expect(await ipad.log.transmitterConnected()).toBe(false);
   });
 
+  it("counts a server that refuses the pairing code as not connected", async () => {
+    const bridge = createFakeBridge();
+    const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
+    const ipad = await connectIpad(server, undefined, {
+      ...SETTINGS,
+      pairingCode: "WRONG234",
+    });
+
+    expect(await ipad.log.callPager(21)).toBe("notConnected");
+    // #33
+    expect(await ipad.log.sendGroupCall()).toBe("notConnected");
+    // #32
+    expect(await ipad.log.sendPowerOff()).toBe("notConnected");
+    expect(bridge.calls).toEqual([]);
+    expect(bridge.groupCalls).toBe(0);
+    expect(bridge.powerOffs).toBe(0);
+  });
+
   it("reports whether the transmitter is connected", async () => {
     const bridge = createFakeBridge();
     const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
