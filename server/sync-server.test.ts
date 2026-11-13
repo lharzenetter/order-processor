@@ -754,6 +754,7 @@ describe("pairing code", () => {
     ],
     ["POST", "/pager-calls", { pager: 21 }],
     ["POST", "/group-calls", undefined],
+    ["POST", "/power-offs", undefined],
     ["GET", "/transmitter", undefined],
   ])(
     "refuses %s %s without a code or with a wrong one",

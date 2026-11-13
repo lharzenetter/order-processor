@@ -295,6 +295,57 @@ export function describeSyncContract(
       });
     });
 
+    async function powerOff(code?: string) {
+      return call("/power-offs", {
+        method: "POST",
+        ...(code === undefined ? {} : { code }),
+      });
+    }
+
+    describe("power-offs", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("relays a power-off and passes each bridge answer on", async () => {
+        // #32
+        for (const result of ["ok", "failed", "notConnected"] as const) {
+          target.bridge.answerCalls(result);
+          expect(await powerOff()).toEqual({ status: 200, body: { result } });
+        }
+        expect(target.bridge.powerOffs).toBe(3);
+        expect(target.bridge.groupCalls).toBe(0);
+        expect(target.bridge.calls).toEqual([]);
+      });
+
+      it("refuses a power-off without the pairing code", async () => {
+        // #32
+        expect((await powerOff("WRONG234")).status).toBe(401);
+        expect(target.bridge.powerOffs).toBe(0);
+      });
+
+      it("counts an unreachable bridge as not connected", async () => {
+        // #32
+        target.bridge.goUnreachable();
+        expect((await powerOff()).body).toEqual({ result: "notConnected" });
+      });
+
+      it("counts a bridge silent for 3 s as not connected", async () => {
+        // #32
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        target.bridge.goSilent();
+        const called = powerOff();
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect((await called).body).toEqual({ result: "notConnected" });
+      });
+
+      it("counts a bridge answer it cannot read as not connected", async () => {
+        // #32
+        target.bridge.answerGarbage();
+        expect((await powerOff()).body).toEqual({ result: "notConnected" });
+      });
+    });
+
     it.runIf(name === "the real server")(
       "archives the replaced log as a file this app can import",
       async () => {

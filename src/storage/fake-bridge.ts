@@ -2,7 +2,7 @@ import type { Fetch, PagerCallResult } from "./server-log";
 
 /**
  * A double of the pager bridge's HTTP API (#23: `POST /calls`, `GET /status`; #33:
- * `POST /group-calls`), for the server and its fake to relay to. Its switches stand for the
+ * `POST /group-calls`; #32: `POST /power-offs`), for the server and its fake to relay to. Its switches stand for the
  * bridge's answers and its failures.
  */
 export interface FakeBridge {
@@ -11,7 +11,9 @@ export interface FakeBridge {
   readonly calls: readonly number[];
   /** How many group calls arrived. */
   readonly groupCalls: number;
-  /** What the next pager and group calls are answered with (default ok). */
+  /** How many power-offs arrived. */
+  readonly powerOffs: number;
+  /** What the next pager calls, group calls and power-offs are answered with (default ok). */
   answerCalls(result: PagerCallResult): void;
   /** What `GET /status` reports (default connected). */
   connectTransmitter(connected: boolean): void;
@@ -26,6 +28,7 @@ export interface FakeBridge {
 export function createFakeBridge(): FakeBridge {
   const calls: number[] = [];
   let groupCalls = 0;
+  let powerOffs = 0;
   let result: PagerCallResult = "ok";
   let connected = true;
   let failure: "unreachable" | "silent" | "garbage" | null = null;
@@ -49,6 +52,10 @@ export function createFakeBridge(): FakeBridge {
     }
     if (method === "POST" && url.pathname === "/group-calls") {
       groupCalls += 1;
+      return callAnswer();
+    }
+    if (method === "POST" && url.pathname === "/power-offs") {
+      powerOffs += 1;
       return callAnswer();
     }
     if (method === "GET" && url.pathname === "/status") {
@@ -80,6 +87,9 @@ export function createFakeBridge(): FakeBridge {
     },
     get groupCalls() {
       return groupCalls;
+    },
+    get powerOffs() {
+      return powerOffs;
     },
     answerCalls(next) {
       result = next;

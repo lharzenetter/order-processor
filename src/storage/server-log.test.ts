@@ -521,6 +521,21 @@ describe("pager calls", () => {
     expect(await ipad.store.load()).toEqual([]);
   });
 
+  it("sends a power-off through the server and reports the bridge's answer, recording nothing", async () => {
+    // #32
+    const bridge = createFakeBridge();
+    const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
+    const ipad = await connectIpad(server);
+
+    for (const result of ["ok", "failed", "notConnected"] as const) {
+      bridge.answerCalls(result);
+      expect(await ipad.log.sendPowerOff()).toBe(result);
+    }
+    expect(bridge.powerOffs).toBe(3);
+    expect(server.events).toEqual([]);
+    expect(await ipad.store.load()).toEqual([]);
+  });
+
   it("counts an unreachable server as not connected", async () => {
     const bridge = createFakeBridge();
     const server = createFakeSyncServer({ bridgeFetch: bridge.fetch });
@@ -530,6 +545,8 @@ describe("pager calls", () => {
     expect(await ipad.log.callPager(21)).toBe("notConnected");
     // #33
     expect(await ipad.log.sendGroupCall()).toBe("notConnected");
+    // #32
+    expect(await ipad.log.sendPowerOff()).toBe("notConnected");
     expect(await ipad.log.transmitterConnected()).toBe(false);
   });
 

@@ -362,6 +362,10 @@ Notes for the list:
    confirmed tap, and the iPads catch up after the PC boots, but it can damage Windows or Docker
    Desktop's virtual disk.
 4. Each evening: _Verwaltung → Exportieren_ on any iPad, and keep the file off the iPad.
+5. To pack the pagers away, put them all in the charging base, then tap _Verwaltung → Sender →
+   Alle Pager ausschalten_ and confirm: every pager in the base turns off (_Pager ausgeschaltet_).
+   It always asks first and records nothing; pagers outside the base stay on. To turn them back on,
+   unplug the charging base and plug it in again, then take each pager out and put it back.
 
 ## 5. When something fails
 

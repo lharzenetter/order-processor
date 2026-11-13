@@ -159,6 +159,10 @@ export function createFakeSyncServer(
     return callResult(await askBridge("/group-calls", { method: "POST" }));
   }
 
+  async function powerOff(): Promise<Response> {
+    return callResult(await askBridge("/power-offs", { method: "POST" }));
+  }
+
   function callResult(
     answer: Readonly<Record<string, unknown>> | undefined,
   ): Response {
@@ -182,6 +186,8 @@ export function createFakeSyncServer(
         return pagerCall(body);
       case "POST /group-calls":
         return groupCall();
+      case "POST /power-offs":
+        return powerOff();
       case "GET /transmitter":
         return transmitter();
       case "GET /log":

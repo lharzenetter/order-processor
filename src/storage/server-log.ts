@@ -77,6 +77,8 @@ export interface ServerLog extends EventLog {
   callPager(pager: number): Promise<PagerCallResult>;
   /** Asks the server to send the group call (#33); records nothing. */
   sendGroupCall(): Promise<PagerCallResult>;
+  /** Asks the server to send the power-off (#32); records nothing. */
+  sendPowerOff(): Promise<PagerCallResult>;
   /** Whether the server reports the transmitter connected; `false` when it can't be asked. */
   transmitterConnected(): Promise<boolean>;
 }
@@ -822,6 +824,16 @@ export function createServerLog(options: ServerLogOptions): ServerLog {
     async sendGroupCall() {
       try {
         const { status, body } = await call("/group-calls", {
+          method: "POST",
+        });
+        return status === 200 ? toPagerCallResult(body) : "notConnected";
+      } catch {
+        return "notConnected";
+      }
+    },
+    async sendPowerOff() {
+      try {
+        const { status, body } = await call("/power-offs", {
           method: "POST",
         });
         return status === 200 ? toPagerCallResult(body) : "notConnected";

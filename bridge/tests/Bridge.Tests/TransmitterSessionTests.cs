@@ -216,6 +216,41 @@ public sealed class TransmitterSessionTests : IDisposable
         Assert.Equal([0x80, 0x10], port.Written.Select(frame => (int)frame[7]));
     }
 
+    [Fact(Timeout = 10_000)]
+    public async Task A_power_off_sends_a_call_to_pager_999_and_reports_ok()
+    {
+        // #32: the keypad's power-off number, acked with call OK on the venue's TD186 (#34).
+        byte[] powerOff = [0xFE, 0x9A, 0x05, 0x01, 0xB1, 0x03, 0xE7, 0x80, 0x21, 0x69];
+        await using var session = await Open();
+        port.OnWrite = _ => port.Send(CallOk);
+
+        var result = await session.PowerOffAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(CallResult.Ok, result);
+        Assert.Equal([powerOff], port.Written);
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task A_power_off_answered_with_call_failed_reports_failed()
+    {
+        // #32
+        await using var session = await Open();
+        port.OnWrite = _ => port.Send(CallFailed);
+
+        Assert.Equal(CallResult.Failed, await session.PowerOffAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact(Timeout = 10_000)]
+    public async Task A_power_off_without_a_heartbeat_for_5_s_reports_not_connected()
+    {
+        // #32
+        await using var session = await Open();
+        time.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(CallResult.NotConnected, await session.PowerOffAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(port.Written);
+    }
+
     private async Task<TransmitterSession> Open()
     {
         port.Send(Heartbeat);

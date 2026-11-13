@@ -54,6 +54,11 @@ app.MapPost(
     async (Transmitter transmitter, CancellationToken cancellationToken) =>
         Results.Ok(new { result = await transmitter.GroupCallAsync(cancellationToken) })
 );
+app.MapPost(
+    "/power-offs",
+    async (Transmitter transmitter, CancellationToken cancellationToken) =>
+        Results.Ok(new { result = await transmitter.PowerOffAsync(cancellationToken) })
+);
 app.MapGet("/status", (Transmitter transmitter) => new { connected = transmitter.IsConnected });
 
 await app.RunAsync();

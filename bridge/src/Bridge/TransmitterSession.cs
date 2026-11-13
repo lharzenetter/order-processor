@@ -83,6 +83,10 @@ public sealed class TransmitterSession : IAsyncDisposable
     public Task<CallResult> GroupCallAsync(CancellationToken cancellationToken) =>
         EnqueueAsync(Frames.GroupCall(SystemId), cancellationToken);
 
+    /// <summary>Queues the power-off, in turn with the pager calls (#32).</summary>
+    public Task<CallResult> PowerOffAsync(CancellationToken cancellationToken) =>
+        EnqueueAsync(Frames.PowerOff(SystemId), cancellationToken);
+
     private async Task<CallResult> EnqueueAsync(byte[] frame, CancellationToken cancellationToken)
     {
         var call = new PendingCall(frame);

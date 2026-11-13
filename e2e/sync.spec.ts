@@ -396,6 +396,80 @@ test("Alle Pager rufen sends the group call from the Verwaltung, asking first wh
   );
 });
 
+test("Alle Pager ausschalten sends the power-off from the Verwaltung, always asking first", async ({
+  browser,
+  request,
+}) => {
+  // #32
+  async function powerOffs(): Promise<number> {
+    const fake = (await (await request.get(`${BRIDGE}/fake`)).json()) as {
+      powerOffs: number;
+    };
+    return fake.powerOffs;
+  }
+  const wayBack =
+    "Alle Pager in der Ladestation ausschalten? Wieder einschalten: Ladestation aus- und einstecken, dann jeden Pager herausnehmen und wieder einsetzen.";
+  const page = await ipad(browser);
+  await connect(page, "Annahme");
+  await connectedAs(page, "Annahme");
+  const verwaltung = page.getByRole("region", { name: "Verwaltung" });
+  const sender = verwaltung.getByRole("region", { name: "Sender" });
+  await expect(sender).toContainText("Sender verbunden");
+  const automaticCalls = sender.getByRole("switch", {
+    name: /Pager automatisch rufen/,
+  });
+  await automaticCalls.click();
+  await expect(automaticCalls).not.toBeChecked();
+  const powerOff = sender.getByRole("button", {
+    name: "Alle Pager ausschalten",
+  });
+  const confirm = page.getByRole("dialog", { name: "Alle Pager ausschalten" });
+
+  // Even with no open order it asks first; Abbrechen sends nothing.
+  await powerOff.click();
+  await expect(confirm).toContainText(wayBack);
+  await confirm.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(confirm).toBeHidden();
+  expect(await powerOffs()).toBe(0);
+
+  // Confirmed, it goes out with automatic pager calls off, recording nothing.
+  await powerOff.click();
+  await confirm.getByRole("button", { name: "Alle Pager ausschalten" }).click();
+  await expect(page.getByRole("status")).toContainText("Pager ausgeschaltet");
+  await expect.poll(powerOffs).toBe(1);
+  // The server's log holds the switch alone.
+  const log = (await (
+    await request.get(`${SERVER}/log`, { headers: { "X-Pairing-Code": CODE } })
+  ).json()) as { lastSeq: number };
+  expect(log.lastSeq).toBe(1);
+
+  await closeVerwaltung(page);
+  await takeOrder(page, { Braten: 1 }, 12);
+  await takeOrder(page, { Pommes: 1 }, 5);
+  await openVerwaltung(page);
+  await request.put(`${BRIDGE}/fake`, { data: { result: "failed" } });
+  await powerOff.click();
+  await expect(confirm).toContainText(`2 Bestellungen noch offen. ${wayBack}`);
+  expect(await powerOffs()).toBe(0);
+  await confirm.getByRole("button", { name: "Alle Pager ausschalten" }).click();
+  const failed = page.getByRole("status");
+  await expect(failed).toContainText("Ausschalten fehlgeschlagen");
+
+  await request.put(`${BRIDGE}/fake`, { data: { result: "ok" } });
+  await failed.getByRole("button", { name: "Erneut senden" }).click();
+  await expect(failed).toContainText("Pager ausgeschaltet");
+  expect(await powerOffs()).toBe(1);
+
+  await request.put(`${BRIDGE}/fake`, {
+    data: { connected: false, result: "notConnected" },
+  });
+  await powerOff.click();
+  await confirm.getByRole("button", { name: "Alle Pager ausschalten" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Sender nicht verbunden",
+  );
+});
+
 test("buzz, re-buzz and hand on call the pager of the order the plate is now with", async ({
   browser,
   request,

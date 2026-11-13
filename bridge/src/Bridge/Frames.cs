@@ -24,6 +24,14 @@ public static class Frames
     /// </summary>
     public static byte[] GroupCall(int systemId) => Command(systemId, 0x3FFF, 0x10);
 
+    /// <summary>
+    /// Turns off every pager in the charging base: a call to pager <c>999</c>, the number the keypad's
+    /// Power Off takes (TD186 manual §3.4; #32). Built here, never from a pager number a caller passes.
+    /// The venue's TD186 acks it with call OK like a pager call (#34), so it needs no "frame written"
+    /// fallback.
+    /// </summary>
+    public static byte[] PowerOff(int systemId) => Command(systemId, 999, 0x80);
+
     private static byte[] Command(int systemId, int pager, byte command)
     {
         byte[] frame =

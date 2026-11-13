@@ -296,6 +296,14 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
     return callResult(answer);
   }
 
+  // #32: like the group call, the body is ignored and the server knows nothing about orders.
+  async function postPowerOff(): Promise<Response> {
+    const answer = await askBridge(bridgeFetch, `${bridgeUrl}/power-offs`, {
+      method: "POST",
+    });
+    return callResult(answer);
+  }
+
   async function getTransmitter(): Promise<Response> {
     const answer = await askBridge(bridgeFetch, `${bridgeUrl}/status`);
     return json(200, { connected: answer?.connected === true });
@@ -377,6 +385,7 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
       "PUT /log": () => putLog(request),
       "POST /pager-calls": () => postPagerCall(request),
       "POST /group-calls": postGroupCall,
+      "POST /power-offs": postPowerOff,
       "GET /transmitter": getTransmitter,
     };
     const handler = handlers[endpoint];

@@ -3,6 +3,7 @@ import { PAGER_COUNT } from "../core/index";
 import { cx } from "./cx";
 import { groupCallQuestion } from "./group-call";
 import { ModalDialog } from "./ModalDialog";
+import { powerOffQuestion } from "./power-off";
 import styles from "./ServerSection.module.css";
 import shared from "./shared.module.css";
 
@@ -23,15 +24,16 @@ function statusText(connected: boolean | null): string {
 }
 
 /**
- * The Verwaltung's transmitter check in sync mode: its status, a Testruf and the group call, which
- * record nothing, and the Pager automatisch rufen switch for every iPad. Status, Testruf and group
- * call work with the switch off.
+ * The Verwaltung's transmitter check in sync mode: its status, a Testruf, the group call and the
+ * power-off, which record nothing, and the Pager automatisch rufen switch for every iPad. All but
+ * the switch work with the switch off.
  */
 export function TransmitterSection({
   connected,
   onTestCall,
   openOrders,
   onGroupCall,
+  onPowerOff,
   pagerCallsOn,
   switchEnabled,
   onSwitchPagerCalls,
@@ -40,6 +42,7 @@ export function TransmitterSection({
   onTestCall: (pager: number) => Promise<void>;
   openOrders: number;
   onGroupCall: () => Promise<void>;
+  onPowerOff: () => Promise<void>;
   pagerCallsOn: boolean;
   /** The switch is recorded, so like every tap it needs the server to count it. */
   switchEnabled: boolean;
@@ -49,6 +52,8 @@ export function TransmitterSection({
   const [calling, setCalling] = useState(false);
   const [groupCalling, setGroupCalling] = useState(false);
   const [confirmingGroupCall, setConfirmingGroupCall] = useState(false);
+  const [poweringOff, setPoweringOff] = useState(false);
+  const [confirmingPowerOff, setConfirmingPowerOff] = useState(false);
   const pager = testCallPager(digits);
   const groupCallAsks = groupCallQuestion(openOrders);
 
@@ -57,6 +62,14 @@ export function TransmitterSection({
     setGroupCalling(true);
     void onGroupCall().finally(() => {
       setGroupCalling(false);
+    });
+  }
+
+  function sendPowerOff(): void {
+    setConfirmingPowerOff(false);
+    setPoweringOff(true);
+    void onPowerOff().finally(() => {
+      setPoweringOff(false);
     });
   }
 
@@ -129,6 +142,44 @@ export function TransmitterSection({
               type="button"
               onClick={() => {
                 setConfirmingGroupCall(false);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </ModalDialog>
+      )}
+      <div className={cx(shared.row, styles.buttons)}>
+        <button
+          type="button"
+          disabled={poweringOff}
+          onClick={() => {
+            setConfirmingPowerOff(true);
+          }}
+        >
+          {poweringOff ? "Schalte alle Pager aus…" : "Alle Pager ausschalten"}
+        </button>
+      </div>
+      {confirmingPowerOff && (
+        <ModalDialog
+          title="Alle Pager ausschalten"
+          onClose={() => {
+            setConfirmingPowerOff(false);
+          }}
+        >
+          <p>{powerOffQuestion(openOrders)}</p>
+          <div className={shared.row}>
+            <button
+              type="button"
+              className={shared.primary}
+              onClick={sendPowerOff}
+            >
+              Alle Pager ausschalten
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingPowerOff(false);
               }}
             >
               Abbrechen

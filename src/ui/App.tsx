@@ -21,6 +21,7 @@ import { KitchenDisplay } from "./KitchenDisplay";
 import { OrderDialog } from "./OrderDialog";
 import { groupCallToast } from "./group-call";
 import { pagerCallToast } from "./pager-call-toast";
+import { powerOffToast } from "./power-off";
 import type { PagerCallToast } from "./pager-call-toast";
 import type { LineActions } from "./OrderDialog";
 import shared from "./shared.module.css";
@@ -102,6 +103,16 @@ export function App() {
     if (result !== null) {
       showCallToast(groupCallToast(result), () => {
         void sendGroupCall();
+      });
+    }
+  }
+
+  // #32: staff confirmed before the first send, so Erneut senden resends without asking again.
+  async function sendPowerOff(): Promise<void> {
+    const result = await board.sendPowerOff();
+    if (result !== null) {
+      showCallToast(powerOffToast(result), () => {
+        void sendPowerOff();
       });
     }
   }
@@ -227,6 +238,7 @@ export function App() {
           showToast={showToast}
           onTestCall={board.callPager}
           onGroupCall={sendGroupCall}
+          onPowerOff={sendPowerOff}
           onSwitchPagerCalls={(on) => {
             void run({ type: "pagerCallsSwitched", on });
           }}
@@ -486,6 +498,7 @@ export function App() {
           showToast={showToast}
           onTestCall={board.callPager}
           onGroupCall={sendGroupCall}
+          onPowerOff={sendPowerOff}
           onSwitchPagerCalls={(on) => {
             void run({ type: "pagerCallsSwitched", on });
           }}

@@ -43,7 +43,8 @@ pnpm build && pnpm preview --port 4173  # the only origin the local server accep
   button to change the Auswahl or end it.
 - `pnpm sync-server` also starts a fake pager bridge on `http://127.0.0.1:9186`, so _Verwaltung →
   Sender_ shows _Sender verbunden_, a _Testruf_ or a buzz, re-buzz or hand on answers _Pager N
-  gerufen_, and _Alle Pager rufen_ answers _Alle Pager gerufen_. With `{"connected":false}` the header shows _Sender getrennt_ within 5 s. Switching
+  gerufen_, _Alle Pager rufen_ answers _Alle Pager gerufen_, and _Alle Pager ausschalten_ answers
+  _Pager ausgeschaltet_ once confirmed. With `{"connected":false}` the header shows _Sender getrennt_ within 5 s. Switching
   off _Pager automatisch rufen_ there stops the calls and the indicator on every iPad; the
   _Testruf_ still works. To try the other answers, tell it what to say:
   `curl -X PUT 127.0.0.1:9186/fake -d '{"result":"failed"}'` (or `"notConnected"`, or
@@ -66,9 +67,10 @@ dotnet publish src/Bridge -c Release -r win-x64 --self-contained -p:PublishSingl
 On the venue machine, `deploy/install-bridge.ps1 -Version <version>` (as administrator) installs or
 updates the release's `order-processor-bridge-<version>.exe` as a service (runbook, section 1.8). It answers on
 `http://127.0.0.1:9186`: `GET /status` gives `{ "connected": true }`, `POST /calls` with
-`{ "pager": 21 }` calls pager 21, and `POST /group-calls` with no body sends the group call, which
-makes every pager outside the charging base vibrate. Both answer `{ "result": "ok" }`, `"failed"`
-or `"notConnected"`.
+`{ "pager": 21 }` calls pager 21, `POST /group-calls` with no body sends the group call, which
+makes every pager outside the charging base vibrate, and `POST /power-offs` with no body sends the
+power-off, which turns off every pager in the charging base. All three answer `{ "result": "ok" }`,
+`"failed"` or `"notConnected"`.
 
 The menu is `src/core/menu.ts`; edit it before a Fest, never during one.
 Glossary: [`CONTEXT.md`](CONTEXT.md). Coding standards: [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
