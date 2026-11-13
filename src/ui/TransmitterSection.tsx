@@ -51,14 +51,15 @@ export function TransmitterSection({
   const [digits, setDigits] = useState("");
   const [calling, setCalling] = useState(false);
   const [groupCalling, setGroupCalling] = useState(false);
-  const [confirmingGroupCall, setConfirmingGroupCall] = useState(false);
+  // The question as asked at the tap, so orders another iPad closes or opens meanwhile neither
+  // change nor hide it, nor bring it back unasked.
+  const [groupCallAsked, setGroupCallAsked] = useState<string | null>(null);
   const [poweringOff, setPoweringOff] = useState(false);
   const [confirmingPowerOff, setConfirmingPowerOff] = useState(false);
   const pager = testCallPager(digits);
-  const groupCallAsks = groupCallQuestion(openOrders);
 
   function sendGroupCall(): void {
-    setConfirmingGroupCall(false);
+    setGroupCallAsked(null);
     setGroupCalling(true);
     void onGroupCall().finally(() => {
       setGroupCalling(false);
@@ -112,24 +113,25 @@ export function TransmitterSection({
           type="button"
           disabled={groupCalling}
           onClick={() => {
-            if (groupCallAsks === null) {
+            const question = groupCallQuestion(openOrders);
+            if (question === null) {
               sendGroupCall();
             } else {
-              setConfirmingGroupCall(true);
+              setGroupCallAsked(question);
             }
           }}
         >
           {groupCalling ? "Rufe alle Pager…" : "Alle Pager rufen"}
         </button>
       </div>
-      {confirmingGroupCall && groupCallAsks !== null && (
+      {groupCallAsked !== null && (
         <ModalDialog
           title="Alle Pager rufen"
           onClose={() => {
-            setConfirmingGroupCall(false);
+            setGroupCallAsked(null);
           }}
         >
-          <p>{groupCallAsks}</p>
+          <p>{groupCallAsked}</p>
           <div className={shared.row}>
             <button
               type="button"
@@ -141,7 +143,7 @@ export function TransmitterSection({
             <button
               type="button"
               onClick={() => {
-                setConfirmingGroupCall(false);
+                setGroupCallAsked(null);
               }}
             >
               Abbrechen
