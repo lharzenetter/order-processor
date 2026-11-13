@@ -1,6 +1,6 @@
-import { assertNever } from "../core/index";
 import type { PagerCallResult } from "../storage/index";
-import type { PagerCallToast } from "./pager-call-toast";
+import { callToast } from "./pager-call-toast";
+import type { CallToast } from "./pager-call-toast";
 
 const WAY_BACK =
   "Alle Pager in der Ladestation ausschalten? Wieder einschalten: Ladestation aus- und einstecken, dann jeden Pager herausnehmen und wieder einsetzen.";
@@ -17,15 +17,10 @@ export function powerOffQuestion(openOrders: number): string {
   return `${String(openOrders)} ${orders} noch offen. ${WAY_BACK}`;
 }
 
-export function powerOffToast(result: PagerCallResult): PagerCallToast {
-  switch (result) {
-    case "ok":
-      return { text: "Pager ausgeschaltet", stays: false, resend: false };
-    case "failed":
-      return { text: "Ausschalten fehlgeschlagen", stays: true, resend: true };
-    case "notConnected":
-      return { text: "Sender nicht verbunden", stays: true, resend: false };
-    default:
-      return assertNever(result);
-  }
+export function powerOffToast(result: PagerCallResult): CallToast {
+  return callToast(result, {
+    ok: "Pager ausgeschaltet",
+    failed: "Ausschalten fehlgeschlagen",
+    notConnected: "Sender nicht verbunden",
+  });
 }

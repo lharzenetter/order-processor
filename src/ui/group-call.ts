@@ -1,6 +1,6 @@
-import { assertNever } from "../core/index";
 import type { PagerCallResult } from "../storage/index";
-import type { PagerCallToast } from "./pager-call-toast";
+import { callToast } from "./pager-call-toast";
+import type { CallToast } from "./pager-call-toast";
 
 /**
  * What staff confirm before a group call while orders are open, since it reaches those orders'
@@ -14,19 +14,10 @@ export function groupCallQuestion(openOrders: number): string | null {
   return `${String(openOrders)} ${orders} noch offen. Trotzdem alle Pager rufen?`;
 }
 
-export function groupCallToast(result: PagerCallResult): PagerCallToast {
-  switch (result) {
-    case "ok":
-      return { text: "Alle Pager gerufen", stays: false, resend: false };
-    case "failed":
-      return {
-        text: "Alle Pager rufen fehlgeschlagen",
-        stays: true,
-        resend: true,
-      };
-    case "notConnected":
-      return { text: "Sender nicht verbunden", stays: true, resend: false };
-    default:
-      return assertNever(result);
-  }
+export function groupCallToast(result: PagerCallResult): CallToast {
+  return callToast(result, {
+    ok: "Alle Pager gerufen",
+    failed: "Alle Pager rufen fehlgeschlagen",
+    notConnected: "Sender nicht verbunden",
+  });
 }

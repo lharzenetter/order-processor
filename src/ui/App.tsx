@@ -22,7 +22,7 @@ import { OrderDialog } from "./OrderDialog";
 import { groupCallToast } from "./group-call";
 import { pagerCallToast } from "./pager-call-toast";
 import { powerOffToast } from "./power-off";
-import type { PagerCallToast } from "./pager-call-toast";
+import type { CallToast } from "./pager-call-toast";
 import type { LineActions } from "./OrderDialog";
 import shared from "./shared.module.css";
 import {
@@ -117,7 +117,7 @@ export function App() {
     }
   }
 
-  function showCallToast(toast: PagerCallToast, resend: () => void): void {
+  function showCallToast(toast: CallToast, resend: () => void): void {
     showToast(
       toast.text,
       toast.stays
