@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { PAGER_COUNT } from "../core/index";
+import { ConfirmedSendButton } from "./ConfirmedSendButton";
 import { cx } from "./cx";
 import { groupCallQuestion } from "./group-call";
-import { ModalDialog } from "./ModalDialog";
 import { powerOffQuestion } from "./power-off";
 import styles from "./ServerSection.module.css";
 import shared from "./shared.module.css";
@@ -50,29 +50,7 @@ export function TransmitterSection({
 }) {
   const [digits, setDigits] = useState("");
   const [calling, setCalling] = useState(false);
-  const [groupCalling, setGroupCalling] = useState(false);
-  // The question as asked at the tap, so orders another iPad closes or opens meanwhile neither
-  // change nor hide it, nor bring it back unasked.
-  const [groupCallAsked, setGroupCallAsked] = useState<string | null>(null);
-  const [poweringOff, setPoweringOff] = useState(false);
-  const [confirmingPowerOff, setConfirmingPowerOff] = useState(false);
   const pager = testCallPager(digits);
-
-  function sendGroupCall(): void {
-    setGroupCallAsked(null);
-    setGroupCalling(true);
-    void onGroupCall().finally(() => {
-      setGroupCalling(false);
-    });
-  }
-
-  function sendPowerOff(): void {
-    setConfirmingPowerOff(false);
-    setPoweringOff(true);
-    void onPowerOff().finally(() => {
-      setPoweringOff(false);
-    });
-  }
 
   return (
     <section className={styles.section} aria-label="Sender">
@@ -108,87 +86,18 @@ export function TransmitterSection({
           {calling ? "Rufe…" : "Rufen"}
         </button>
       </div>
-      <div className={cx(shared.row, styles.buttons)}>
-        <button
-          type="button"
-          disabled={groupCalling}
-          onClick={() => {
-            const question = groupCallQuestion(openOrders);
-            if (question === null) {
-              sendGroupCall();
-            } else {
-              setGroupCallAsked(question);
-            }
-          }}
-        >
-          {groupCalling ? "Rufe alle Pager…" : "Alle Pager rufen"}
-        </button>
-      </div>
-      {groupCallAsked !== null && (
-        <ModalDialog
-          title="Alle Pager rufen"
-          onClose={() => {
-            setGroupCallAsked(null);
-          }}
-        >
-          <p>{groupCallAsked}</p>
-          <div className={shared.row}>
-            <button
-              type="button"
-              className={shared.primary}
-              onClick={sendGroupCall}
-            >
-              Alle Pager rufen
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setGroupCallAsked(null);
-              }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </ModalDialog>
-      )}
-      <div className={cx(shared.row, styles.buttons)}>
-        <button
-          type="button"
-          disabled={poweringOff}
-          onClick={() => {
-            setConfirmingPowerOff(true);
-          }}
-        >
-          {poweringOff ? "Schalte alle Pager aus…" : "Alle Pager ausschalten"}
-        </button>
-      </div>
-      {confirmingPowerOff && (
-        <ModalDialog
-          title="Alle Pager ausschalten"
-          onClose={() => {
-            setConfirmingPowerOff(false);
-          }}
-        >
-          <p>{powerOffQuestion(openOrders)}</p>
-          <div className={shared.row}>
-            <button
-              type="button"
-              className={shared.primary}
-              onClick={sendPowerOff}
-            >
-              Alle Pager ausschalten
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConfirmingPowerOff(false);
-              }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </ModalDialog>
-      )}
+      <ConfirmedSendButton
+        label="Alle Pager rufen"
+        busyLabel="Rufe alle Pager…"
+        question={groupCallQuestion(openOrders)}
+        onSend={onGroupCall}
+      />
+      <ConfirmedSendButton
+        label="Alle Pager ausschalten"
+        busyLabel="Schalte alle Pager aus…"
+        question={powerOffQuestion(openOrders)}
+        onSend={onPowerOff}
+      />
       <label className={styles.toggle}>
         <input
           type="checkbox"
