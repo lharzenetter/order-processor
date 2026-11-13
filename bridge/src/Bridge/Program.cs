@@ -49,15 +49,23 @@ app.MapPost(
             ? Results.Ok(new { result = await transmitter.CallAsync(pager, cancellationToken) })
             : Results.BadRequest()
 );
+// The bodiless endpoints require a header a browser cannot send without a CORS preflight, which the
+// bridge never answers, so a page open on the venue PC cannot send them as a simple cross-origin
+// POST (review of #32 and #33). /calls is covered already: it needs an application/json body.
+const string CallerHeader = "X-Bridge-Caller";
 app.MapPost(
     "/group-calls",
-    async (Transmitter transmitter, CancellationToken cancellationToken) =>
-        Results.Ok(new { result = await transmitter.GroupCallAsync(cancellationToken) })
+    async (HttpRequest request, Transmitter transmitter, CancellationToken cancellationToken) =>
+        request.Headers[CallerHeader] == "server"
+            ? Results.Ok(new { result = await transmitter.GroupCallAsync(cancellationToken) })
+            : Results.StatusCode(StatusCodes.Status403Forbidden)
 );
 app.MapPost(
     "/power-offs",
-    async (Transmitter transmitter, CancellationToken cancellationToken) =>
-        Results.Ok(new { result = await transmitter.PowerOffAsync(cancellationToken) })
+    async (HttpRequest request, Transmitter transmitter, CancellationToken cancellationToken) =>
+        request.Headers[CallerHeader] == "server"
+            ? Results.Ok(new { result = await transmitter.PowerOffAsync(cancellationToken) })
+            : Results.StatusCode(StatusCodes.Status403Forbidden)
 );
 app.MapGet("/status", (Transmitter transmitter) => new { connected = transmitter.IsConnected });
 

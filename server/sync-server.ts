@@ -147,6 +147,10 @@ function appendedMessage(event: StoredEvent): string {
   return `event: appended\nid: ${String(event.seq)}\ndata: ${event.json}\n\n`;
 }
 
+// The bridge refuses a bodiless group call or power-off without this header, so a page in a browser
+// on the venue PC cannot send one as a simple cross-origin POST (review of #32 and #33).
+const BRIDGE_CALLER = { "X-Bridge-Caller": "server" };
+
 /** The bridge's answer as JSON, or undefined when it is unreachable, slow or answers garbage. */
 async function askBridge(
   bridgeFetch: BridgeFetch,
@@ -292,6 +296,7 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
   async function postGroupCall(): Promise<Response> {
     const answer = await askBridge(bridgeFetch, `${bridgeUrl}/group-calls`, {
       method: "POST",
+      headers: BRIDGE_CALLER,
     });
     return callResult(answer);
   }
@@ -300,6 +305,7 @@ export function createSyncServer(options: SyncServerOptions): SyncServer {
   async function postPowerOff(): Promise<Response> {
     const answer = await askBridge(bridgeFetch, `${bridgeUrl}/power-offs`, {
       method: "POST",
+      headers: BRIDGE_CALLER,
     });
     return callResult(answer);
   }

@@ -39,6 +39,8 @@ export interface FakeSyncServer {
 export const FAKE_PING_EVERY_MS = 10_000;
 // #23, as on the real server.
 const BRIDGE_TIMEOUT_MS = 3_000;
+// As on the real server: the bridge refuses a bodiless call without it.
+const BRIDGE_CALLER = { "X-Bridge-Caller": "server" };
 
 interface Replacement {
   readonly previousLogId: string | null;
@@ -156,11 +158,21 @@ export function createFakeSyncServer(
   }
 
   async function groupCall(): Promise<Response> {
-    return callResult(await askBridge("/group-calls", { method: "POST" }));
+    return callResult(
+      await askBridge("/group-calls", {
+        method: "POST",
+        headers: BRIDGE_CALLER,
+      }),
+    );
   }
 
   async function powerOff(): Promise<Response> {
-    return callResult(await askBridge("/power-offs", { method: "POST" }));
+    return callResult(
+      await askBridge("/power-offs", {
+        method: "POST",
+        headers: BRIDGE_CALLER,
+      }),
+    );
   }
 
   function callResult(

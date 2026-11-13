@@ -63,6 +63,8 @@ dotnet publish src/Bridge -c Release -r win-x64 --self-contained -p:PublishSingl
 On the venue machine, `deploy/install-bridge.ps1 -Version <version>` (as administrator) installs or updates the release's `order-processor-bridge-<version>.exe` as a service (runbook, section 1.8).
 It answers on `http://127.0.0.1:9186`: `GET /status` gives `{ "connected": true }`, `POST /calls` with `{ "pager": 21 }` calls pager 21, `POST /group-calls` with no body sends the group call, which makes every pager outside the charging base vibrate, and `POST /power-offs` with no body sends the power-off, which turns off every pager in the charging base.
 All three answer `{ "result": "ok" }`, `"failed"` or `"notConnected"`.
+`POST /group-calls` and `POST /power-offs` also need the header `X-Bridge-Caller: server`, which the server sends; without it they answer 403, so a web page open on the venue machine can't send them.
+To try one by hand: `curl -X POST -H 'X-Bridge-Caller: server' 127.0.0.1:9186/group-calls`.
 
 The menu is `src/core/menu.ts`; edit it before a Fest, never during one.
 Glossary: [`CONTEXT.md`](CONTEXT.md). Coding standards: [`CODING_STANDARDS.md`](CODING_STANDARDS.md).

@@ -25,6 +25,10 @@ export interface FakeBridge {
   goSilent(): void;
 }
 
+// Like the real bridge, the bodiless endpoints refuse a request without this header, so a page in a
+// browser on the venue PC cannot send one as a simple cross-origin POST.
+const BRIDGE_CALLER_HEADER = "X-Bridge-Caller";
+
 export function createFakeBridge(): FakeBridge {
   const calls: number[] = [];
   let groupCalls = 0;
@@ -39,7 +43,19 @@ export function createFakeBridge(): FakeBridge {
       : Response.json({ result });
   }
 
-  function answer(method: string, url: URL, body: unknown): Response {
+  function answer(
+    method: string,
+    url: URL,
+    body: unknown,
+    headers: Headers,
+  ): Response {
+    if (
+      method === "POST" &&
+      (url.pathname === "/group-calls" || url.pathname === "/power-offs") &&
+      headers.get(BRIDGE_CALLER_HEADER) !== "server"
+    ) {
+      return new Response(null, { status: 403 });
+    }
     if (method === "POST" && url.pathname === "/calls") {
       const pager =
         typeof body === "object" && body !== null && "pager" in body
@@ -77,7 +93,14 @@ export function createFakeBridge(): FakeBridge {
     }
     const body: unknown =
       typeof init.body === "string" ? JSON.parse(init.body) : undefined;
-    return Promise.resolve(answer(init.method ?? "GET", new URL(input), body));
+    return Promise.resolve(
+      answer(
+        init.method ?? "GET",
+        new URL(input),
+        body,
+        new Headers(init.headers),
+      ),
+    );
   }
 
   return {

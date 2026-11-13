@@ -28,6 +28,14 @@ async function handle(
   response: ServerResponse,
 ): Promise<void> {
   const route = `${request.method ?? "GET"} ${request.url ?? "/"}`;
+  // Like the real bridge, the bodiless calls need the server's caller header.
+  if (
+    (route === "POST /group-calls" || route === "POST /power-offs") &&
+    request.headers["x-bridge-caller"] !== "server"
+  ) {
+    reply(response, 403, null);
+    return;
+  }
   const body: unknown =
     request.method === "GET"
       ? null
