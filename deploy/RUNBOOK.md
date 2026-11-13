@@ -344,8 +344,9 @@ Notes for the list:
 
 - _Testruf_ is in _Verwaltung → Sender_: enter the pager number under _Testruf an Pager_, tap
   _Rufen_. It records nothing.
-- _Alle Pager rufen_ is below it. At closing time it finds the pagers not yet returned; while
-  orders are open, it asks first. It records nothing.
+- _Alle Pager rufen_ is below it.
+  At closing time it finds the pagers not yet returned; while orders are open, it asks first.
+  It records nothing.
 - Stop and start the bridge as administrator with `Stop-Service order-processor-bridge` and
   `Start-Service order-processor-bridge`. Start it again after that check.
 - The buzz checks record real taps: run them before the Fest starts, then start it with an empty
@@ -362,10 +363,9 @@ Notes for the list:
    confirmed tap, and the iPads catch up after the PC boots, but it can damage Windows or Docker
    Desktop's virtual disk.
 4. Each evening: _Verwaltung → Exportieren_ on any iPad, and keep the file off the iPad.
-5. To pack the pagers away, put them all in the charging base, then tap _Verwaltung → Sender →
-   Alle Pager ausschalten_ and confirm: every pager in the base turns off (_Pager ausgeschaltet_).
-   It always asks first and records nothing; pagers outside the base stay on. To turn them back on,
-   unplug the charging base and plug it in again, then take each pager out and put it back.
+5. To pack the pagers away, put them all in the charging base, then tap _Verwaltung → Sender → Alle Pager ausschalten_ and confirm: every pager in the base turns off (_Pager ausgeschaltet_).
+   It always asks first and records nothing; pagers outside the base stay on.
+   To turn them back on, unplug the charging base and plug it in again, then take each pager out and put it back.
 
 ## 5. When something fails
 
