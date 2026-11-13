@@ -232,6 +232,8 @@ Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'order-
 The bridge learns the System ID from the transmitter; there is nothing to configure. If the
 keypad's Host ID (menu F1) changes, the bridge picks it up after the next reconnect.
 
+To remove the bridge from the PC, see section 8.
+
 ### 1.9 Each iPad
 
 1. Open the web app from `https://lharzenetter.github.io/order-processor/` and add it to the Home
@@ -447,3 +449,33 @@ the kit.
    ```
 
 4. If the new PC has another address, update the IONOS `A` record (1.5).
+
+## 8. Uninstall the bridge
+
+This removes the Windows service and its exe. The server keeps running, but _Verwaltung → Sender_
+shows _Sender nicht verbunden_ until a bridge is installed again (1.8).
+
+As administrator:
+
+```powershell
+Stop-Service -Name order-processor-bridge -Force
+sc.exe delete order-processor-bridge
+Remove-Item -Recurse -Force C:\kirbe\bridge
+```
+
+Write `sc.exe`, not `sc`: in PowerShell, `sc` is short for `Set-Content`. If `sc.exe delete`
+reports that the service is marked for deletion, close the _Services_ window and the Event Viewer,
+then sign out and back in. Windows removes the service once nothing holds it open.
+
+The entries the bridge wrote stay in the Windows Event Log. To also remove the bridge as an event
+source:
+
+```powershell
+[System.Diagnostics.EventLog]::DeleteEventSource('order-processor-bridge')
+```
+
+Check that the service is gone. This should print nothing:
+
+```powershell
+Get-Service -Name order-processor-bridge -ErrorAction SilentlyContinue
+```
