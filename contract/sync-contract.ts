@@ -245,106 +245,72 @@ export function describeSyncContract(
       });
     });
 
-    async function groupCall(code?: string) {
-      return call("/group-calls", {
-        method: "POST",
-        ...(code === undefined ? {} : { code }),
+    const sends = [
+      // #33
+      {
+        name: "group calls",
+        one: "a group call",
+        path: "/group-calls",
+        count: () => target.bridge.groupCalls,
+        other: () => target.bridge.powerOffs,
+      },
+      // #32
+      {
+        name: "power-offs",
+        one: "a power-off",
+        path: "/power-offs",
+        count: () => target.bridge.powerOffs,
+        other: () => target.bridge.groupCalls,
+      },
+    ];
+
+    for (const { name: sendName, one, path, count, other } of sends) {
+      describe(sendName, () => {
+        afterEach(() => {
+          vi.useRealTimers();
+        });
+
+        async function send(code?: string) {
+          return call(path, {
+            method: "POST",
+            ...(code === undefined ? {} : { code }),
+          });
+        }
+
+        it(`relays ${one} and passes each bridge answer on`, async () => {
+          for (const result of ["ok", "failed", "notConnected"] as const) {
+            target.bridge.answerCalls(result);
+            expect(await send()).toEqual({ status: 200, body: { result } });
+          }
+          expect(count()).toBe(3);
+          expect(other()).toBe(0);
+          expect(target.bridge.calls).toEqual([]);
+        });
+
+        it(`refuses ${one} without the pairing code`, async () => {
+          expect((await send("WRONG234")).status).toBe(401);
+          expect(count()).toBe(0);
+        });
+
+        it("counts an unreachable bridge as not connected", async () => {
+          target.bridge.goUnreachable();
+          expect((await send()).body).toEqual({ result: "notConnected" });
+        });
+
+        it("counts a bridge silent for 3 s as not connected", async () => {
+          vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+          target.bridge.goSilent();
+          const called = send();
+          await vi.advanceTimersByTimeAsync(3_000);
+          expect((await called).body).toEqual({ result: "notConnected" });
+        });
+
+        it("counts a bridge answer it cannot read as not connected", async () => {
+          target.bridge.answerGarbage();
+          expect((await send()).body).toEqual({ result: "notConnected" });
+        });
       });
     }
-
-    describe("group calls", () => {
-      afterEach(() => {
-        vi.useRealTimers();
-      });
-
-      it("relays a group call and passes each bridge answer on", async () => {
-        // #33
-        for (const result of ["ok", "failed", "notConnected"] as const) {
-          target.bridge.answerCalls(result);
-          expect(await groupCall()).toEqual({ status: 200, body: { result } });
-        }
-        expect(target.bridge.groupCalls).toBe(3);
-        expect(target.bridge.calls).toEqual([]);
-      });
-
-      it("refuses a group call without the pairing code", async () => {
-        // #33
-        expect((await groupCall("WRONG234")).status).toBe(401);
-        expect(target.bridge.groupCalls).toBe(0);
-      });
-
-      it("counts an unreachable bridge as not connected", async () => {
-        // #33
-        target.bridge.goUnreachable();
-        expect((await groupCall()).body).toEqual({ result: "notConnected" });
-      });
-
-      it("counts a bridge silent for 3 s as not connected", async () => {
-        // #33
-        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-        target.bridge.goSilent();
-        const called = groupCall();
-        await vi.advanceTimersByTimeAsync(3_000);
-        expect((await called).body).toEqual({ result: "notConnected" });
-      });
-
-      it("counts a bridge answer it cannot read as not connected", async () => {
-        // #33
-        target.bridge.answerGarbage();
-        expect((await groupCall()).body).toEqual({ result: "notConnected" });
-      });
-    });
-
-    async function powerOff(code?: string) {
-      return call("/power-offs", {
-        method: "POST",
-        ...(code === undefined ? {} : { code }),
-      });
-    }
-
-    describe("power-offs", () => {
-      afterEach(() => {
-        vi.useRealTimers();
-      });
-
-      it("relays a power-off and passes each bridge answer on", async () => {
-        // #32
-        for (const result of ["ok", "failed", "notConnected"] as const) {
-          target.bridge.answerCalls(result);
-          expect(await powerOff()).toEqual({ status: 200, body: { result } });
-        }
-        expect(target.bridge.powerOffs).toBe(3);
-        expect(target.bridge.groupCalls).toBe(0);
-        expect(target.bridge.calls).toEqual([]);
-      });
-
-      it("refuses a power-off without the pairing code", async () => {
-        // #32
-        expect((await powerOff("WRONG234")).status).toBe(401);
-        expect(target.bridge.powerOffs).toBe(0);
-      });
-
-      it("counts an unreachable bridge as not connected", async () => {
-        // #32
-        target.bridge.goUnreachable();
-        expect((await powerOff()).body).toEqual({ result: "notConnected" });
-      });
-
-      it("counts a bridge silent for 3 s as not connected", async () => {
-        // #32
-        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-        target.bridge.goSilent();
-        const called = powerOff();
-        await vi.advanceTimersByTimeAsync(3_000);
-        expect((await called).body).toEqual({ result: "notConnected" });
-      });
-
-      it("counts a bridge answer it cannot read as not connected", async () => {
-        // #32
-        target.bridge.answerGarbage();
-        expect((await powerOff()).body).toEqual({ result: "notConnected" });
-      });
-    });
 
     it.runIf(name === "the real server")(
       "archives the replaced log as a file this app can import",
